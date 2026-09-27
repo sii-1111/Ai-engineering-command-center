@@ -23,7 +23,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["agents*", "apps*", "core*", "mcp*"]
+include = ["agents*", "apps*", "core*", "tooling*"]
 
 [tool.ruff]
 line-length = 100
