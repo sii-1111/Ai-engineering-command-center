@@ -1,6 +1,8 @@
 import base64
 import json
+
 from mcp.server.fastmcp import FastMCP
+
 from mcp.github.client import GitHubClient
 
 mcp = FastMCP("github-engineering-tools")
