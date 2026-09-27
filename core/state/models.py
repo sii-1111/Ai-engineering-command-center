@@ -8,6 +8,8 @@ class Evidence(TypedDict):
 
 class EngineeringState(TypedDict, total=False):
     task: str
+    repository: str
+    ref: str
     plan: list[str]
     current_step: int
     evidence: list[Evidence]
