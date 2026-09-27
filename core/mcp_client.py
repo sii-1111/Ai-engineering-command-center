@@ -9,7 +9,7 @@ from mcp.client.stdio import stdio_client
 async def call_github_tool(tool_name: str, arguments: dict[str, Any]) -> str:
     server = StdioServerParameters(
         command=os.getenv("PYTHON_BIN", "python"),
-        args=["-m", "mcp.github.server"],
+        args=["-m", "tooling.github.server"],
         env=dict(os.environ),
     )
     async with stdio_client(server) as (read, write), ClientSession(read, write) as session:
