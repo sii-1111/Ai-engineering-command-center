@@ -20,6 +20,9 @@ dev = [
   "mypy>=1.13",
 ]
 
+[tool.setuptools.packages.find]
+include = ["agents*", "apps*", "core*", "mcp*"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
