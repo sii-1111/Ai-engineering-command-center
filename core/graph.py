@@ -19,7 +19,7 @@ def produce_report(state: EngineeringState) -> EngineeringState:
             f"Impact: {report.get('impact', 'Not established')}\\n"
             f"Recommended Change: {report.get('recommended_change', 'None')}\\n"
             f"Files Involved: {report.get('files_involved', [])}\\n"
-            f"Confidence: {report.get('confidence', 0.0)}\\n"
+            f"Confidence: {report.get('confidence', 0.0):.2f}\\n"
             f"Approval Required: {report.get('approval_required', False)}\\n"
             f"Tool Calls: {len(state.get('tool_calls', []))}"
         ),
