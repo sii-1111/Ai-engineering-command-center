@@ -1,10 +1,9 @@
-
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from agents.llm_planner import build_dynamic_plan, decide_next_action, prepare_change_plan
-from agents.tool_executor import execute_approved_change, execute_next_tool
+from agents.tool_executor import execute_approved_change, execute_next_tool, verify_change
 from core.state.models import EngineeringState
 
 _CHECKPOINTER = InMemorySaver()
@@ -66,6 +65,7 @@ def build_graph():
     graph.add_node("prepare_change", prepare_change_plan)
     graph.add_node("approval_gate", approval_gate)
     graph.add_node("execute_change", execute_approved_change)
+    graph.add_node("verify_change", verify_change)
     graph.add_edge(START, "planner")
     graph.add_edge("planner", "execute_tool")
     graph.add_edge("execute_tool", "decide_next")
@@ -73,5 +73,6 @@ def build_graph():
     graph.add_edge("report", "prepare_change")
     graph.add_edge("prepare_change", "approval_gate")
     graph.add_conditional_edges("approval_gate", route_after_approval)
-    graph.add_edge("execute_change", END)
+    graph.add_edge("execute_change", "verify_change")
+    graph.add_edge("verify_change", END)
     return graph.compile(checkpointer=_CHECKPOINTER)
