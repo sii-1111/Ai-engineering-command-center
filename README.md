@@ -138,6 +138,7 @@ flowchart TD
 - [x] PostgreSQL-backed LangGraph checkpoint foundation
 - [x] Optional Redis task snapshot store and health signal
 - [ ] Azure Blob ingestion
+- [x] Repository retrieval abstraction
 - [ ] Azure AI Search hybrid retrieval
 - [ ] Working memory
 - [ ] Long-term engineering knowledge
