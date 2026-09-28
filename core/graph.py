@@ -1,4 +1,7 @@
+import os
+
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
@@ -8,7 +11,21 @@ from agents.tool_executor import execute_approved_change, execute_next_tool, ver
 from core.evaluation import evaluate_task
 from core.state.models import EngineeringState
 
-_CHECKPOINTER = InMemorySaver()
+_CHECKPOINTER_CONTEXT = None
+
+
+def _build_checkpointer():
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return InMemorySaver()
+    global _CHECKPOINTER_CONTEXT
+    _CHECKPOINTER_CONTEXT = PostgresSaver.from_conn_string(database_url)
+    checkpointer = _CHECKPOINTER_CONTEXT.__enter__()
+    checkpointer.setup()
+    return checkpointer
+
+
+_CHECKPOINTER = _build_checkpointer()
 
 
 def route_after_decision(state: EngineeringState) -> str:
@@ -20,13 +37,13 @@ def produce_report(state: EngineeringState) -> EngineeringState:
     return {
         **state,
         "final_report": (
-            f"Root Cause: {report.get('root_cause', 'Not established')}\n"
-            f"Evidence: {report.get('evidence', [])}\n"
-            f"Impact: {report.get('impact', 'Not established')}\n"
-            f"Recommended Change: {report.get('recommended_change', 'None')}\n"
-            f"Files Involved: {report.get('files_involved', [])}\n"
-            f"Confidence: {report.get('confidence', 0.0):.2f}\n"
-            f"Approval Required: {report.get('approval_required', False)}\n"
+            f"Root Cause: {report.get('root_cause', 'Not established')}\\n"
+            f"Evidence: {report.get('evidence', [])}\\n"
+            f"Impact: {report.get('impact', 'Not established')}\\n"
+            f"Recommended Change: {report.get('recommended_change', 'None')}\\n"
+            f"Files Involved: {report.get('files_involved', [])}\\n"
+            f"Confidence: {report.get('confidence', 0.0):.2f}\\n"
+            f"Approval Required: {report.get('approval_required', False)}\\n"
             f"Tool Calls: {len(state.get('tool_calls', []))}"
         ),
         "status": "report_ready",
