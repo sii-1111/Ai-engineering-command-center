@@ -1,7 +1,7 @@
 from core.mcp_client import call_github_tool_sync
 from core.state.models import EngineeringState
 
-ALLOWED_TOOLS = {"search_code", "list_repository", "read_file"}
+READ_ONLY_TOOLS = {"search_code", "list_repository", "read_file"}
 
 
 def execute_next_tool(state: EngineeringState) -> EngineeringState:
@@ -12,7 +12,7 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
     step = (state.get("dynamic_plan") or [{}])[0]
     tool = step.get("tool")
 
-    if tool not in ALLOWED_TOOLS:
+    if tool not in READ_ONLY_TOOLS:
         return {**state, "status": "investigation_complete", "report": {
             "root_cause": "Planner selected an unsupported tool.",
             "evidence": [],
