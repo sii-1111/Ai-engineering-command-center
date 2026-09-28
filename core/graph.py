@@ -4,6 +4,8 @@ from langgraph.types import interrupt
 
 from agents.llm_planner import build_dynamic_plan, decide_next_action, prepare_change_plan
 from agents.reviewer import review_change
+from core.evaluation import evaluate_task
+from core.observability import record_event
 from agents.tool_executor import execute_approved_change, execute_next_tool, verify_change
 from core.state.models import EngineeringState
 
@@ -68,6 +70,7 @@ def build_graph():
     graph.add_node("execute_change", execute_approved_change)
     graph.add_node("verify_change", verify_change)
     graph.add_node("review_change", review_change)
+    graph.add_node("evaluate_task", evaluate_task)
     graph.add_edge(START, "planner")
     graph.add_edge("planner", "execute_tool")
     graph.add_edge("execute_tool", "decide_next")
@@ -77,5 +80,6 @@ def build_graph():
     graph.add_conditional_edges("approval_gate", route_after_approval)
     graph.add_edge("execute_change", "verify_change")
     graph.add_edge("verify_change", "review_change")
-    graph.add_edge("review_change", END)
+    graph.add_edge("review_change", "evaluate_task")
+    graph.add_edge("evaluate_task", END)
     return graph.compile(checkpointer=_CHECKPOINTER)
