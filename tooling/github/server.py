@@ -81,5 +81,24 @@ def create_pull_request(
     return json.dumps(client().create_pull_request(repository, title, body, head, base))
 
 
+@mcp.tool()
+def get_commit_checks(repository: str, ref: str) -> str:
+    """Read CI check-run status for a commit or branch."""
+    result = client().get_commit_checks(repository, ref)
+    return json.dumps({
+        "ref": ref,
+        "total_count": result.get("total_count", 0),
+        "checks": [
+            {
+                "name": item.get("name"),
+                "status": item.get("status"),
+                "conclusion": item.get("conclusion"),
+                "url": item.get("html_url"),
+            }
+            for item in result.get("check_runs", [])
+        ],
+    })
+
+
 if __name__ == "__main__":
     mcp.run()

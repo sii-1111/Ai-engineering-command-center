@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from agents.tool_executor import verify_change
 from core.graph import build_graph
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
@@ -41,6 +42,9 @@ def _serialize_result(task_id: str, result: dict) -> dict:
         "report": result.get("report", {}),
         "final_report": result.get("final_report", ""),
         "approval_status": result.get("approval_status", "not_required"),
+        "verification_status": result.get("verification_status", "not_started"),
+        "verification_result": result.get("verification_result", {}),
+        "pull_request": result.get("pull_request", {}),
     }
 
 
@@ -75,3 +79,15 @@ async def submit_approval(task_id: str, request: ApprovalRequest) -> dict:
 
     result = graph.invoke(Command(resume=request.approved), config=_config(task_id))
     return _serialize_result(task_id, result)
+
+
+@app.get("/v1/tasks/{task_id}/verification")
+async def get_verification(task_id: str) -> dict:
+    config = _config(task_id)
+    state = graph.get_state(config)
+    if not state.values:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    verified = verify_change(state.values)
+    graph.update_state(config, verified)
+    return _serialize_result(task_id, verified)

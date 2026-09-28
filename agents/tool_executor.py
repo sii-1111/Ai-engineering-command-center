@@ -1,3 +1,4 @@
+import json
 from uuid import uuid4
 
 from core.mcp_client import call_github_tool_sync
@@ -56,8 +57,6 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
         current = call_github_tool_sync(
             "read_file", {"repository": repository, "path": path, "ref": base}
         )
-        import json
-
         current_data = json.loads(current)
         current_sha = current_data.get("sha")
         if not current_sha:
@@ -92,4 +91,67 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
         "change_branch": branch,
         "change_result": json.loads(update_raw),
         "pull_request": json.loads(pr_raw),
+    }
+
+
+def verify_change(state: EngineeringState) -> EngineeringState:
+    """Evaluate GitHub Actions check runs for the generated change commit."""
+    pull_request = state.get("pull_request", {})
+    head_sha = pull_request.get("head_sha")
+    if not head_sha:
+        return {
+            **state,
+            "status": "verification_failed",
+            "verification_status": "failed",
+            "verification_result": {"error": "Pull request head SHA is unavailable."},
+        }
+
+    try:
+        raw = call_github_tool_sync(
+            "get_commit_checks",
+            {"repository": state["repository"], "ref": head_sha},
+        )
+        data = json.loads(raw)
+    except (ValueError, KeyError, RuntimeError) as exc:
+        return {
+            **state,
+            "status": "verification_failed",
+            "verification_status": "failed",
+            "verification_result": {"error": str(exc)},
+        }
+
+    checks = data.get("checks", [])
+    if not checks:
+        return {
+            **state,
+            "status": "verification_pending",
+            "verification_status": "pending",
+            "verification_result": {"message": "CI has not reported any check runs yet.", "checks": []},
+        }
+
+    pending = [item for item in checks if item.get("status") != "completed"]
+    failed = [
+        item for item in checks
+        if item.get("status") == "completed"
+        and item.get("conclusion") not in {"success", "skipped", "neutral"}
+    ]
+    if pending:
+        verification_status = "pending"
+        status = "verification_pending"
+    elif failed:
+        verification_status = "failed"
+        status = "verification_failed"
+    else:
+        verification_status = "passed"
+        status = "verification_passed"
+
+    return {
+        **state,
+        "status": status,
+        "verification_status": verification_status,
+        "verification_result": {
+            "checks": checks,
+            "passed": verification_status == "passed",
+            "failed_checks": failed,
+        },
     }
