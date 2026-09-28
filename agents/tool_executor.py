@@ -1,4 +1,3 @@
-import re
 from uuid import uuid4
 
 from core.mcp_client import call_github_tool_sync
