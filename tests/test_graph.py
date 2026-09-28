@@ -60,6 +60,12 @@ def fake_github_tool(
             '{"number":99,"html_url":"https://github.com/example/repo/pull/99",'
             '"head_sha":"test-head-sha"}'
         )
+    if tool_name == "get_commit_checks":
+        return (
+            '{"ref":"test-head-sha","total_count":1,"checks":['
+            '{"name":"Tests","status":"completed","conclusion":"success",'
+            '"url":"https://github.com/example/check"}]}'
+        )
 
 
 def _config() -> dict:
