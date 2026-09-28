@@ -7,6 +7,8 @@ from azure.storage.blob import BlobServiceClient
 
 from core.retrieval.ingestion import RepositoryFile
 
+_SUPPORTED_SUFFIXES = (".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".md", ".txt")
+
 
 @dataclass(frozen=True)
 class AzureBlobConfig:
@@ -34,7 +36,7 @@ class AzureBlobRepositorySource:
         container = self.client.get_container_client(self.container)
         files: list[RepositoryFile] = []
         for blob in container.list_blobs(name_starts_with=prefix):
-            if not blob.name.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yaml", ".yml", ".md", ".txt")):
+            if not blob.name.endswith(_SUPPORTED_SUFFIXES):
                 continue
             content = container.download_blob(blob.name).readall().decode("utf-8")
             path = blob.name.removeprefix(prefix)
