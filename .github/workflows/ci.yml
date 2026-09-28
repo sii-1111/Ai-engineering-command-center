@@ -20,3 +20,17 @@ jobs:
         run: ruff check .
       - name: Tests
         run: pytest
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install web dependencies
+        working-directory: apps/web
+        run: npm install
+      - name: Build web app
+        working-directory: apps/web
+        run: npm run build
