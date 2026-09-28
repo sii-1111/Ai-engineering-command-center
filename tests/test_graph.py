@@ -44,7 +44,7 @@ class FakeLLM:
         }
 
 
-def fake_github_tool(tool_name: str, arguments: dict) -> str:
+def fake_github_tool(tool_name: str, arguments: dict, agent: str = "unknown") -> str:
     if tool_name == "search_code":
         return SEARCH_EVIDENCE
     if tool_name == "create_branch":
@@ -213,7 +213,7 @@ def test_graph_requires_repository(monkeypatch) -> None:
 def test_approved_change_creates_branch_updates_file_and_opens_pr(monkeypatch) -> None:
     calls = []
 
-    def fake_write_tool(tool_name: str, arguments: dict) -> str:
+    def fake_write_tool(tool_name: str, arguments: dict, agent: str = "unknown") -> str:
         calls.append((tool_name, arguments))
         if tool_name == "read_file":
             return '{"path":"apps/api/app/main.py","sha":"current-sha"}'
@@ -250,7 +250,7 @@ def test_approved_change_creates_branch_updates_file_and_opens_pr(monkeypatch) -
 
 
 def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
-    def fake_checks(tool_name: str, arguments: dict) -> str:
+    def fake_checks(tool_name: str, arguments: dict, agent: str = "unknown") -> str:
         assert tool_name == "get_commit_checks"
         assert arguments["ref"] == "head-sha"
         return (
