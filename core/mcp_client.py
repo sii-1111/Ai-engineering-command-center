@@ -4,7 +4,6 @@ from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
 from core.security.tool_policy import DEFAULT_TOOL_POLICY
 
 
