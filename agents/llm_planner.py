@@ -36,6 +36,17 @@ Rules for a finished report:
 Do not invent evidence. Keep the investigation focused.
 {TOOL_DESCRIPTIONS}"""
 
+CHANGE_SYSTEM = """You are an AI software engineer preparing an exact, reviewable change after an investigation.
+Return JSON only:
+{"path":"repo-relative/path","content":"complete new file content","summary":"what changed","commit_message":"...","pr_title":"...","pr_body":"..."}
+Rules:
+- Change exactly one existing file.
+- Path must be one of files_involved.
+- Preserve unrelated behavior.
+- Provide complete file content, not a diff.
+- Do not add secrets, credentials, destructive commands, or generated binaries.
+- The change must directly address the recommended_change and be supported by evidence.
+"""
 
 def _bounded_tool_calls(state: EngineeringState) -> bool:
     return len(state.get("tool_calls", [])) >= MAX_TOOL_CALLS or state.get("current_step", 0) >= MAX_ITERATIONS
@@ -74,11 +85,7 @@ def _bounded_report(state: EngineeringState) -> EngineeringReport:
 
 
 def build_dynamic_plan(state: EngineeringState) -> EngineeringState:
-    prompt = json.dumps({
-        "task": state["task"],
-        "repository": state["repository"],
-        "ref": state.get("ref", "main"),
-    })
+    prompt = json.dumps({"task": state["task"], "repository": state["repository"], "ref": state.get("ref", "main")})
     plan = LLM().invoke_json([
         {"role": "system", "content": PLANNER_SYSTEM},
         {"role": "user", "content": prompt},
@@ -90,26 +97,42 @@ def build_dynamic_plan(state: EngineeringState) -> EngineeringState:
 def decide_next_action(state: EngineeringState) -> EngineeringState:
     if _bounded_tool_calls(state):
         return {**state, "status": "investigation_complete", "report": _bounded_report(state)}
-
     context = json.dumps({
-        "task": state["task"],
-        "repository": state["repository"],
-        "ref": state.get("ref", "main"),
-        "tool_calls": state.get("tool_calls", []),
-        "evidence": state.get("evidence", []),
+        "task": state["task"], "repository": state["repository"], "ref": state.get("ref", "main"),
+        "tool_calls": state.get("tool_calls", []), "evidence": state.get("evidence", []),
     })
     decision = LLM().invoke_json([
         {"role": "system", "content": DECISION_SYSTEM},
         {"role": "user", "content": context},
     ])
-
     if decision.get("action") == "finish":
-        report = _normalize_report(decision.get("report", {}), state.get("evidence", []))
-        return {**state, "status": "investigation_complete", "report": report}
+        return {**state, "status": "investigation_complete",
+                "report": _normalize_report(decision.get("report", {}), state.get("evidence", []))}
+    return {**state,
+            "dynamic_plan": [{"tool": decision.get("tool"), "arguments": decision.get("arguments", {})}],
+            "current_step": state.get("current_step", 0) + 1,
+            "status": "ready_to_execute"}
 
-    return {
-        **state,
-        "dynamic_plan": [{"tool": decision.get("tool"), "arguments": decision.get("arguments", {})}],
-        "current_step": state.get("current_step", 0) + 1,
-        "status": "ready_to_execute",
-    }
+
+def prepare_change_plan(state: EngineeringState) -> EngineeringState:
+    report = state.get("report", {})
+    if not report.get("approval_required", False):
+        return {**state, "status": "change_not_required"}
+    context = json.dumps({
+        "task": state["task"], "repository": state["repository"], "report": report,
+        "evidence": state.get("evidence", []),
+    })
+    plan = LLM().invoke_json([
+        {"role": "system", "content": CHANGE_SYSTEM},
+        {"role": "user", "content": context},
+    ])
+    if plan.get("path") not in report.get("files_involved", []):
+        return {**state, "status": "change_plan_invalid", "change_plan": {}}
+    return {**state, "status": "awaiting_approval", "change_plan": {
+        "path": plan.get("path"),
+        "content": plan.get("content", ""),
+        "summary": plan.get("summary", ""),
+        "commit_message": plan.get("commit_message", "feat: apply approved engineering change"),
+        "pr_title": plan.get("pr_title", "feat: apply approved engineering change"),
+        "pr_body": plan.get("pr_body", ""),
+    }}
