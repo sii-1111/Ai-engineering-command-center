@@ -37,20 +37,13 @@ def produce_report(state: EngineeringState) -> EngineeringState:
     return {
         **state,
         "final_report": (
-            f"Root Cause: {report.get('root_cause', 'Not established')}
-"
-            f"Evidence: {report.get('evidence', [])}
-"
-            f"Impact: {report.get('impact', 'Not established')}
-"
-            f"Recommended Change: {report.get('recommended_change', 'None')}
-"
-            f"Files Involved: {report.get('files_involved', [])}
-"
-            f"Confidence: {report.get('confidence', 0.0):.2f}
-"
-            f"Approval Required: {report.get('approval_required', False)}
-"
+            f"Root Cause: {report.get('root_cause', 'Not established')}\\n"
+            f"Evidence: {report.get('evidence', [])}\\n"
+            f"Impact: {report.get('impact', 'Not established')}\\n"
+            f"Recommended Change: {report.get('recommended_change', 'None')}\\n"
+            f"Files Involved: {report.get('files_involved', [])}\\n"
+            f"Confidence: {report.get('confidence', 0.0):.2f}\\n"
+            f"Approval Required: {report.get('approval_required', False)}\\n"
             f"Tool Calls: {len(state.get('tool_calls', []))}"
         ),
         "status": "report_ready",
