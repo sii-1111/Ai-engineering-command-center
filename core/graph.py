@@ -5,7 +5,6 @@ from langgraph.types import interrupt
 from agents.llm_planner import build_dynamic_plan, decide_next_action, prepare_change_plan
 from agents.reviewer import review_change
 from core.evaluation import evaluate_task
-from core.observability import record_event
 from agents.tool_executor import execute_approved_change, execute_next_tool, verify_change
 from core.state.models import EngineeringState
 
