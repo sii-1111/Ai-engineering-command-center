@@ -68,6 +68,7 @@ def test_graph_pauses_for_human_approval(monkeypatch) -> None:
     FakeLLM.calls = 0
     monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
+    monkeypatch.setattr("agents.reviewer.LLM", FakeLLM)
 
     graph = build_graph()
     result = graph.invoke({
@@ -90,8 +91,19 @@ def test_graph_pauses_for_human_approval(monkeypatch) -> None:
 
 def test_graph_resumes_after_approval(monkeypatch) -> None:
     FakeLLM.calls = 0
+
+    class ReviewerFakeLLM:
+        def invoke_json(self, messages: list[dict[str, str]]) -> dict:
+            return {
+                "decision": "approve",
+                "summary": "The verified change addresses the reported issue.",
+                "findings": [],
+                "confidence": 0.95,
+            }
+
     monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
+    monkeypatch.setattr("agents.reviewer.LLM", ReviewerFakeLLM)
 
     graph = build_graph()
     config = _config()
@@ -108,7 +120,9 @@ def test_graph_resumes_after_approval(monkeypatch) -> None:
     assert paused["__interrupt__"]
     resumed = graph.invoke(Command(resume=True), config=config)
 
-    assert resumed["status"] == "verification_passed"
+    assert resumed["status"] == "review_approve"
+    assert resumed["review"]["decision"] == "approve"
+    assert resumed["verification_status"] == "passed"
     assert resumed["approval_status"] == "approved"
     assert resumed["report"]["approval_required"] is True
     assert resumed["change_branch"].startswith("ai-fix-")
@@ -286,3 +300,55 @@ def test_verify_change_fails_when_a_check_fails(monkeypatch) -> None:
     assert result["status"] == "verification_failed"
     assert result["verification_status"] == "failed"
     assert result["verification_result"]["failed_checks"][0]["name"] == "Tests"
+
+
+
+def test_reviewer_approves_verified_change(monkeypatch) -> None:
+    class ReviewLLM:
+        def invoke_json(self, messages: list[dict[str, str]]) -> dict:
+            return {
+                "decision": "approve",
+                "summary": "The change addresses the reported root cause and verification passed.",
+                "findings": [],
+                "confidence": 0.95,
+            }
+
+    monkeypatch.setattr("agents.reviewer.LLM", ReviewLLM)
+    result = __import__("agents.reviewer", fromlist=["review_change"]).review_change({
+        "task": "Optimize the search endpoint.",
+        "report": {
+            "root_cause": "Inefficient search implementation.",
+            "evidence": ["observed evidence"],
+            "impact": "High latency.",
+            "recommended_change": "Optimize the search implementation.",
+            "files_involved": ["apps/api/app/main.py"],
+            "confidence": 0.9,
+            "approval_required": True,
+        },
+        "evidence": [{"source": "github://repo/read_file", "detail": "observed evidence"}],
+        "change_plan": {"path": "apps/api/app/main.py", "summary": "Optimize search."},
+        "verification_status": "passed",
+        "verification_result": {"passed": True, "checks": []},
+    })
+    assert result["status"] == "review_approve"
+    assert result["review"]["decision"] == "approve"
+    assert result["review"]["findings"] == []
+
+
+def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None:
+    class ReviewLLM:
+        def invoke_json(self, messages: list[dict[str, str]]) -> dict:
+            return {
+                "decision": "unknown",
+                "summary": "Needs review.",
+                "findings": [{"severity": "urgent", "category": "safety", "message": "Check manually."}],
+                "confidence": 4.0,
+            }
+
+    monkeypatch.setattr("agents.reviewer.LLM", ReviewLLM)
+    from agents.reviewer import review_change
+
+    result = review_change({"task": "Review change.", "verification_status": "failed"})
+    assert result["review"]["decision"] == "request_changes"
+    assert result["review"]["findings"][0]["severity"] == "medium"
+    assert result["review"]["confidence"] == 1.0

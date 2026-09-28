@@ -45,6 +45,7 @@ def _serialize_result(task_id: str, result: dict) -> dict:
         "verification_status": result.get("verification_status", "not_started"),
         "verification_result": result.get("verification_result", {}),
         "pull_request": result.get("pull_request", {}),
+        "review": result.get("review", {}),
     }
 
 
