@@ -352,3 +352,28 @@ def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None
     assert result["review"]["decision"] == "request_changes"
     assert result["review"]["findings"][0]["severity"] == "medium"
     assert result["review"]["confidence"] == 1.0
+
+
+def test_evaluate_task_reports_core_metrics() -> None:
+    from core.evaluation import evaluate_task
+
+    result = evaluate_task({
+        "status": "review_approve",
+        "evidence": [{"source": "tool", "detail": "evidence"}],
+        "tool_calls": [{"tool": "read_file"}],
+        "report": {"confidence": 0.9},
+        "approval_status": "approved",
+        "verification_status": "passed",
+        "verification_result": {
+            "checks": [{"name": "Tests", "status": "completed", "conclusion": "success"}]
+        },
+        "review": {"decision": "approve", "confidence": 0.95, "findings": []},
+        "observability_events": [{"event": "task_started"}],
+    })
+
+    assert result["evaluation"]["task_completed"] is True
+    assert result["evaluation"]["investigation"]["evidence_count"] == 1
+    assert result["evaluation"]["investigation"]["tool_call_count"] == 1
+    assert result["evaluation"]["change"]["verification_status"] == "passed"
+    assert result["evaluation"]["review"]["decision"] == "approve"
+    assert result["evaluation"]["observability"]["event_count"] == 1

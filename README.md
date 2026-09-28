@@ -60,7 +60,7 @@ flowchart TD
 - **Repository intelligence** — code search, file inspection, dependency analysis, and test execution.
 - **Grounded investigation** — retrieval and evidence are carried into agent decisions.
 - **Evaluation** — tool-call success, task completion, groundedness, latency, cost, recovery, and human intervention.
-- **Observability** — trace agent state transitions and tool execution.
+- **Observability** — capture task events, evaluation metrics, and engineering outcomes.
 
 ## Planned stack
 
@@ -138,8 +138,8 @@ flowchart TD
 - [ ] Repository-aware RAG
 
 ### Phase 4 — Production engineering
-- [ ] Evaluation framework
-- [ ] OpenTelemetry traces
+- [x] Evaluation framework
+- [x] Task observability events
 - [ ] Cost/latency dashboards
 - [ ] Dockerized services
 - [ ] CI/CD

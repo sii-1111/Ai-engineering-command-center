@@ -5,6 +5,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from agents.tool_executor import verify_change
+from core.evaluation import evaluate_task
 from core.graph import build_graph
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
@@ -46,6 +47,8 @@ def _serialize_result(task_id: str, result: dict) -> dict:
         "verification_result": result.get("verification_result", {}),
         "pull_request": result.get("pull_request", {}),
         "review": result.get("review", {}),
+        "evaluation": result.get("evaluation", {}),
+        "observability_events": result.get("observability_events", []),
     }
 
 
@@ -66,6 +69,7 @@ async def create_task(request: TaskRequest) -> dict:
             "findings": [],
             "tool_calls": [],
             "status": "started",
+            "observability_events": [{"timestamp": "task-created", "event": "task_started"}],
         },
         config=_config(task_id),
     )
@@ -92,3 +96,14 @@ async def get_verification(task_id: str) -> dict:
     verified = verify_change(state.values)
     graph.update_state(config, verified)
     return _serialize_result(task_id, verified)
+
+
+@app.get("/v1/tasks/{task_id}/evaluation")
+async def get_evaluation(task_id: str) -> dict:
+    config = _config(task_id)
+    state = graph.get_state(config)
+    if not state.values:
+        raise HTTPException(status_code=404, detail="Task not found")
+    evaluated = evaluate_task(state.values)
+    graph.update_state(config, evaluated)
+    return _serialize_result(task_id, evaluated)
