@@ -1,19 +1,27 @@
 from langgraph.graph import END, START, StateGraph
 
-from agents.llm_planner import build_dynamic_plan
-from agents.tool_executor import execute_dynamic_plan
+from agents.llm_planner import build_dynamic_plan, decide_next_action
+from agents.tool_executor import execute_next_tool
 from core.state.models import EngineeringState
 
 
+def route_after_decision(state: EngineeringState) -> str:
+    return "report" if state.get("status") == "investigation_complete" else "execute_tool"
+
+
 def produce_report(state: EngineeringState) -> EngineeringState:
+    report = state.get("report", {})
     return {
         **state,
         "final_report": (
-            f"Task: {state['task']}\\n"
-            f"Repository: {state['repository']}\\n"
-            f"Dynamic steps: {len(state.get('dynamic_plan', []))}\\n"
-            f"Evidence items: {len(state.get('evidence', []))}\\n"
-            f"Tool calls: {len(state.get('tool_calls', []))}"
+            f"Root Cause: {report.get('root_cause', 'Not established')}\\n"
+            f"Evidence: {report.get('evidence', [])}\\n"
+            f"Impact: {report.get('impact', 'Not established')}\\n"
+            f"Recommended Change: {report.get('recommended_change', 'None')}\\n"
+            f"Files Involved: {report.get('files_involved', [])}\\n"
+            f"Confidence: {report.get('confidence', 0.0)}\\n"
+            f"Approval Required: {report.get('approval_required', False)}\\n"
+            f"Tool Calls: {len(state.get('tool_calls', []))}"
         ),
         "status": "completed",
     }
@@ -22,10 +30,12 @@ def produce_report(state: EngineeringState) -> EngineeringState:
 def build_graph():
     graph = StateGraph(EngineeringState)
     graph.add_node("planner", build_dynamic_plan)
-    graph.add_node("execute_tools", execute_dynamic_plan)
+    graph.add_node("execute_tool", execute_next_tool)
+    graph.add_node("decide_next", decide_next_action)
     graph.add_node("report", produce_report)
     graph.add_edge(START, "planner")
-    graph.add_edge("planner", "execute_tools")
-    graph.add_edge("execute_tools", "report")
+    graph.add_edge("planner", "execute_tool")
+    graph.add_edge("execute_tool", "decide_next")
+    graph.add_conditional_edges("decide_next", route_after_decision)
     graph.add_edge("report", END)
     return graph.compile()
