@@ -91,8 +91,19 @@ def test_graph_pauses_for_human_approval(monkeypatch) -> None:
 
 def test_graph_resumes_after_approval(monkeypatch) -> None:
     FakeLLM.calls = 0
+
+    class ReviewerFakeLLM:
+        def invoke_json(self, messages: list[dict[str, str]]) -> dict:
+            return {
+                "decision": "approve",
+                "summary": "The verified change addresses the reported issue.",
+                "findings": [],
+                "confidence": 0.95,
+            }
+
     monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
+    monkeypatch.setattr("agents.reviewer.LLM", ReviewerFakeLLM)
 
     graph = build_graph()
     config = _config()
