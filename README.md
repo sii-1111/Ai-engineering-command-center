@@ -144,8 +144,8 @@ flowchart TD
 
 ## Project status
 
-**Milestone 9 — Recruiter-grade Command Center.**
+**Active development — production-style AI engineering platform.**
 
-The project has evolved from an architecture scaffold into a working production-style AI engineering workflow with LangGraph orchestration, MCP-based GitHub tooling, bounded investigation, evidence-backed root-cause analysis, human approval, automated code-change/PR flow, verification, reviewer/critic analysis, evaluation metrics, observability events, and a recruiter-facing Next.js Command Center UI.
+The foundation is now implemented and the project has progressed beyond the initial architecture scaffold. The current system supports end-to-end engineering investigation: task planning with LangGraph, bounded repository investigation through MCP, evidence-backed root-cause analysis, confidence scoring, human approval before mutations, automated branch/PR creation, verification, reviewer/critic analysis, evaluation metrics, observability events, and a recruiter-facing Next.js Command Center.
 
-The next focus areas are production hardening, live infrastructure integrations, richer evaluation/observability, and deployment.
+The current focus is **production hardening and deployment** — expanding live infrastructure integrations, strengthening evaluation and observability, improving security and tool isolation, and deploying the platform as a fully accessible application.
