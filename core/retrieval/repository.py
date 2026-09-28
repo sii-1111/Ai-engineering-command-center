@@ -5,8 +5,8 @@ local implementation over evidence already collected by the investigation.
 Azure AI Search can implement the same interface without changing agents.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 
 @dataclass(frozen=True)
