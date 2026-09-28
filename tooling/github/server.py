@@ -50,5 +50,36 @@ def list_repository(repository: str, path: str = "", ref: str = "main") -> str:
     ])
 
 
+@mcp.tool()
+def create_branch(repository: str, branch: str, base_ref: str = "main") -> str:
+    """Create a new branch from a base ref. Use only after human approval."""
+    return json.dumps(client().create_branch(repository, branch, base_ref))
+
+
+@mcp.tool()
+def update_file(
+    repository: str,
+    path: str,
+    content: str,
+    branch: str,
+    message: str,
+    sha: str,
+) -> str:
+    """Update an existing file on an already-created branch. Use only after human approval."""
+    return json.dumps(client().update_file(repository, path, content, branch, message, sha))
+
+
+@mcp.tool()
+def create_pull_request(
+    repository: str,
+    title: str,
+    body: str,
+    head: str,
+    base: str = "main",
+) -> str:
+    """Create a pull request from a change branch to the base branch."""
+    return json.dumps(client().create_pull_request(repository, title, body, head, base))
+
+
 if __name__ == "__main__":
     mcp.run()
