@@ -82,3 +82,9 @@ class GitHubClient:
             f"/repos/{repository}/pulls",
             json={"title": title, "body": body, "head": head, "base": base},
         )
+
+    def get_commit_checks(self, repository: str, ref: str) -> Any:
+        return self._get(
+            f"/repos/{repository}/commits/{ref}/check-runs",
+            {"per_page": "50"},
+        )
