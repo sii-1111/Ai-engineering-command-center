@@ -1,5 +1,6 @@
 import pytest
 
+from agents.tool_executor import _blocked_tool_state
 from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolPermissionError
 
 
@@ -38,3 +39,18 @@ def test_enforce_raises_with_structured_denial():
         "risk": "high",
         "reason": "Agent 'research_agent' is not permitted to execute 'update_file'.",
     }
+
+
+def test_blocked_execution_records_audit_event():
+    error = ToolPermissionError(DEFAULT_TOOL_POLICY.authorize("research_agent", "update_file"))
+    state = {"observability_events": []}
+
+    result = _blocked_tool_state(state, "research_agent", "update_file", error)
+    event = result["observability_events"][-1]
+
+    assert event["event"] == "tool_execution"
+    assert event["agent"] == "research_agent"
+    assert event["tool"] == "update_file"
+    assert event["risk"] == "high"
+    assert event["approved"] is False
+    assert event["result"] == "blocked"
