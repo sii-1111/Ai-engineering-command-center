@@ -9,7 +9,14 @@ from core.state.models import EngineeringState
 READ_ONLY_TOOLS = {"search_code", "list_repository", "read_file"}
 
 
-def _tool_audit(state: EngineeringState, agent: str, tool: str, allowed: bool, risk: str, result: str) -> EngineeringState:
+def _tool_audit(
+    state: EngineeringState,
+    agent: str,
+    tool: str,
+    allowed: bool,
+    risk: str,
+    result: str,
+) -> EngineeringState:
     return record_event(
         state,
         "tool_execution",
@@ -21,7 +28,12 @@ def _tool_audit(state: EngineeringState, agent: str, tool: str, allowed: bool, r
     )
 
 
-def _blocked_tool_state(state: EngineeringState, agent: str, tool: str, error: ToolPermissionError) -> EngineeringState:
+def _blocked_tool_state(
+    state: EngineeringState,
+    agent: str,
+    tool: str,
+    error: ToolPermissionError,
+) -> EngineeringState:
     decision = error.decision
     audited = _tool_audit(state, agent, tool, False, decision.risk, "blocked")
     return {
@@ -71,12 +83,20 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
 
 def execute_approved_change(state: EngineeringState) -> EngineeringState:
     if state.get("approval_status") != "approved":
-        return {**state, "status": "rejected", "change_result": {"error": "Change was not approved."}}
+        return {
+            **state,
+            "status": "rejected",
+            "change_result": {"error": "Change was not approved."},
+        }
 
     plan = state.get("change_plan", {})
     path = str(plan.get("path", ""))
     if not path or path.startswith("/") or ".." in path.split("/"):
-        return {**state, "status": "change_failed", "change_result": {"error": "Invalid repository path."}}
+        return {
+            **state,
+            "status": "change_failed",
+            "change_result": {"error": "Invalid repository path."},
+        }
 
     branch = f"ai-fix-{uuid4().hex[:8]}"
     repository = state["repository"]
@@ -85,7 +105,9 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
     try:
         decision = DEFAULT_TOOL_POLICY.enforce(agent, "create_branch")
         branch_result = call_github_tool_sync(
-            "create_branch", {"repository": repository, "branch": branch, "base_ref": base}, agent=agent
+            "create_branch",
+            {"repository": repository, "branch": branch, "base_ref": base},
+            agent=agent,
         )
         current_decision = DEFAULT_TOOL_POLICY.enforce(agent, "read_file")
         current = call_github_tool_sync(
@@ -115,7 +137,12 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
         }, agent=agent)
     except ToolPermissionError as exc:
         audited = _tool_audit(state, agent, exc.decision.tool, False, exc.decision.risk, "blocked")
-        return {**audited, "status": "change_failed", "change_branch": branch, "change_result": {"error": str(exc)}}
+        return {
+            **audited,
+            "status": "change_failed",
+            "change_branch": branch,
+            "change_result": {"error": str(exc)},
+        }
     except (ValueError, KeyError, RuntimeError) as exc:
         return {
             **state,
@@ -187,7 +214,10 @@ def verify_change(state: EngineeringState) -> EngineeringState:
             **audited,
             "status": "verification_pending",
             "verification_status": "pending",
-            "verification_result": {"message": "CI has not reported any check runs yet.", "checks": []},
+            "verification_result": {
+                "message": "CI has not reported any check runs yet.",
+                "checks": [],
+            },
         }
 
     pending = [item for item in checks if item.get("status") != "completed"]
