@@ -44,7 +44,9 @@ class FakeLLM:
         }
 
 
-def fake_github_tool(tool_name: str, arguments: dict) -> str:
+def fake_github_tool(
+    tool_name: str, arguments: dict, agent: str = "unknown"
+) -> str:
     if tool_name == "search_code":
         return SEARCH_EVIDENCE
     if tool_name == "create_branch":
@@ -54,10 +56,16 @@ def fake_github_tool(tool_name: str, arguments: dict) -> str:
     if tool_name == "update_file":
         return '{"commit":{"sha":"change-commit"}}'
     if tool_name == "create_pull_request":
-        return '{"number":99,"html_url":"https://github.com/example/repo/pull/99","head_sha":"test-head-sha"}'
+        return (
+            '{"number":99,"html_url":"https://github.com/example/repo/pull/99",'
+            '"head_sha":"test-head-sha"}'
+        )
     if tool_name == "get_commit_checks":
-        return '{"ref":"test-head-sha","total_count":1,"checks":[{"name":"Tests","status":"completed","conclusion":"success","url":"https://github.com/example/check"}]}'
-    raise AssertionError(f"Unexpected tool: {tool_name}")
+        return (
+            '{"ref":"test-head-sha","total_count":1,"checks":['
+            '{"name":"Tests","status":"completed","conclusion":"success",'
+            '"url":"https://github.com/example/check"}]}'
+        )
 
 
 def _config() -> dict:
@@ -213,7 +221,9 @@ def test_graph_requires_repository(monkeypatch) -> None:
 def test_approved_change_creates_branch_updates_file_and_opens_pr(monkeypatch) -> None:
     calls = []
 
-    def fake_write_tool(tool_name: str, arguments: dict) -> str:
+    def fake_write_tool(
+    tool_name: str, arguments: dict, agent: str = "unknown"
+) -> str:
         calls.append((tool_name, arguments))
         if tool_name == "read_file":
             return '{"path":"apps/api/app/main.py","sha":"current-sha"}'
@@ -250,7 +260,9 @@ def test_approved_change_creates_branch_updates_file_and_opens_pr(monkeypatch) -
 
 
 def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
-    def fake_checks(tool_name: str, arguments: dict) -> str:
+    def fake_checks(
+    tool_name: str, arguments: dict, agent: str = "unknown"
+) -> str:
         assert tool_name == "get_commit_checks"
         assert arguments["ref"] == "head-sha"
         return (
@@ -270,7 +282,9 @@ def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
 
 
 def test_verify_change_stays_pending_while_checks_run(monkeypatch) -> None:
-    def fake_checks(tool_name: str, arguments: dict) -> str:
+    def fake_checks(
+    tool_name: str, arguments: dict, agent: str = "unknown"
+) -> str:
         return (
             '{"ref":"head-sha","total_count":1,"checks":['
             '{"name":"Tests","status":"in_progress","conclusion":null}]}'
@@ -286,7 +300,9 @@ def test_verify_change_stays_pending_while_checks_run(monkeypatch) -> None:
 
 
 def test_verify_change_fails_when_a_check_fails(monkeypatch) -> None:
-    def fake_checks(tool_name: str, arguments: dict) -> str:
+    def fake_checks(
+    tool_name: str, arguments: dict, agent: str = "unknown"
+) -> str:
         return (
             '{"ref":"head-sha","total_count":1,"checks":['
             '{"name":"Tests","status":"completed","conclusion":"failure"}]}'
@@ -341,7 +357,13 @@ def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None
             return {
                 "decision": "unknown",
                 "summary": "Needs review.",
-                "findings": [{"severity": "urgent", "category": "safety", "message": "Check manually."}],
+                "findings": [
+                    {
+                        "severity": "urgent",
+                        "category": "safety",
+                        "message": "Check manually.",
+                    }
+                ],
                 "confidence": 4.0,
             }
 
@@ -352,8 +374,6 @@ def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None
     assert result["review"]["decision"] == "request_changes"
     assert result["review"]["findings"][0]["severity"] == "medium"
     assert result["review"]["confidence"] == 1.0
-
-
 def test_evaluate_task_reports_core_metrics() -> None:
     from core.evaluation import evaluate_task
 
