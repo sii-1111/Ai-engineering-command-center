@@ -47,6 +47,14 @@ class FakeLLM:
 def fake_github_tool(tool_name: str, arguments: dict) -> str:
     if tool_name == "search_code":
         return SEARCH_EVIDENCE
+    if tool_name == "create_branch":
+        return '{"ref":"refs/heads/ai-fix-test"}'
+    if tool_name == "read_file":
+        return '{"path":"apps/api/app/main.py","sha":"current-sha"}'
+    if tool_name == "update_file":
+        return '{"commit":{"sha":"change-commit"}}'
+    if tool_name == "create_pull_request":
+        return '{"number":99,"html_url":"https://github.com/example/repo/pull/99"}'
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
