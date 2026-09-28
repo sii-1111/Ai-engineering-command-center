@@ -14,6 +14,13 @@ Example:
 
 ## Architecture
 
+### Interactive GitDiagram
+
+Explore the repository architecture interactively in GitDiagram:
+
+[Open AI Engineering Command Center in GitDiagram](https://gitdiagram.com/sii-1111/Ai-engineering-command-center)
+
+
 ```mermaid
 flowchart TD
     U[Engineer] --> UI[Web Command Center]
