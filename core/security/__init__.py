@@ -1,1 +1,1 @@
-"""Tool authorization and human approval policies."""
+"""Security policies for agent tool execution."""
