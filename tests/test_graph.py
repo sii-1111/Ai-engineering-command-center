@@ -277,7 +277,9 @@ def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
 
 
 def test_verify_change_stays_pending_while_checks_run(monkeypatch) -> None:
-    def fake_checks(tool_name: str, arguments: dict) -> str:
+    def fake_checks(
+    tool_name: str, arguments: dict, agent: str = "unknown"
+) -> str:
         return (
             '{"ref":"head-sha","total_count":1,"checks":['
             '{"name":"Tests","status":"in_progress","conclusion":null}]}'
