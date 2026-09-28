@@ -139,7 +139,7 @@ flowchart TD
 - [x] Optional Redis task snapshot store and health signal
 - [ ] Azure Blob ingestion
 - [x] Repository retrieval abstraction
-- [ ] Azure AI Search hybrid retrieval
+- [x] Azure AI Search hybrid retrieval
 - [ ] Working memory
 - [ ] Long-term engineering knowledge
 - [ ] Repository-aware RAG

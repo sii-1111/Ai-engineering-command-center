@@ -1,3 +1,9 @@
-from core.retrieval.repository import RepositoryRetriever
+from core.retrieval.azure_search import AzureRepositoryRetriever, AzureSearchConfig
+from core.retrieval.repository import RepositoryRetriever, RetrievalDocument
 
-__all__ = ["RepositoryRetriever"]
+__all__ = [
+    "AzureRepositoryRetriever",
+    "AzureSearchConfig",
+    "RepositoryRetriever",
+    "RetrievalDocument",
+]
