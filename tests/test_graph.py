@@ -351,7 +351,14 @@ def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None
             return {
                 "decision": "unknown",
                 "summary": "Needs review.",
-                "findings": [{"severity": "urgent", "category": "safety", "message": "Check manually."}],
+                "findings": [
+                    {
+                        "severity": "urgent",
+                        "category": "safety",
+                        "message": "Check manually.",
+                    }
+                ],
+                "confidence": 4.0,
             }
 
     monkeypatch.setattr("agents.reviewer.LLM", ReviewLLM)
@@ -361,8 +368,6 @@ def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None
     assert result["review"]["decision"] == "request_changes"
     assert result["review"]["findings"][0]["severity"] == "medium"
     assert result["review"]["confidence"] == 1.0
-
-
 def test_evaluate_task_reports_core_metrics() -> None:
     from core.evaluation import evaluate_task
 
