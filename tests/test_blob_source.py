@@ -15,7 +15,10 @@ def test_blob_config_requires_connection_string(monkeypatch):
 def test_blob_source_lists_supported_text_files(blob_client):
     container = Mock()
     blob_client.from_connection_string.return_value.get_container_client.return_value = container
-    container.list_blobs.return_value = [Mock(name="owner/repo/main/app.py", etag="etag1"), Mock(name="owner/repo/main/logo.png", etag="etag2")]
+    container.list_blobs.return_value = [
+        Mock(name="owner/repo/main/app.py", etag="etag1"),
+        Mock(name="owner/repo/main/logo.png", etag="etag2"),
+    ]
     download = Mock()
     download.readall.return_value = b"print('ok')"
     container.download_blob.return_value = download
