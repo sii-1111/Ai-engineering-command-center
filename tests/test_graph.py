@@ -239,9 +239,11 @@ def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
     def fake_checks(tool_name: str, arguments: dict) -> str:
         assert tool_name == "get_commit_checks"
         assert arguments["ref"] == "head-sha"
-        return '{"ref":"head-sha","total_count":2,"checks":['
-               '{"name":"Lint","status":"completed","conclusion":"success"},'
-               '{"name":"Tests","status":"completed","conclusion":"success"}]}'
+        return (
+            '{"ref":"head-sha","total_count":2,"checks":['
+            '{"name":"Lint","status":"completed","conclusion":"success"},'
+            '{"name":"Tests","status":"completed","conclusion":"success"}]}'
+        )
 
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_checks)
     result = tool_executor.verify_change({
@@ -255,8 +257,10 @@ def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
 
 def test_verify_change_stays_pending_while_checks_run(monkeypatch) -> None:
     def fake_checks(tool_name: str, arguments: dict) -> str:
-        return '{"ref":"head-sha","total_count":1,"checks":['
-               '{"name":"Tests","status":"in_progress","conclusion":null}]}'
+        return (
+            '{"ref":"head-sha","total_count":1,"checks":['
+            '{"name":"Tests","status":"in_progress","conclusion":null}]}'
+        )
 
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_checks)
     result = tool_executor.verify_change({
