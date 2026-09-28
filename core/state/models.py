@@ -16,6 +16,19 @@ class EngineeringReport(TypedDict):
     approval_required: bool
 
 
+class ReviewFinding(TypedDict):
+    severity: str
+    category: str
+    message: str
+
+
+class ReviewResult(TypedDict):
+    decision: str
+    summary: str
+    findings: list[ReviewFinding]
+    confidence: float
+
+
 class EngineeringState(TypedDict, total=False):
     task: str
     repository: str
@@ -37,3 +50,4 @@ class EngineeringState(TypedDict, total=False):
     pull_request: dict
     verification_status: str
     verification_result: dict
+    review: ReviewResult
