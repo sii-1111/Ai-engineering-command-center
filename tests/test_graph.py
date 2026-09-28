@@ -54,9 +54,9 @@ def fake_github_tool(tool_name: str, arguments: dict, agent: str = "unknown") ->
     if tool_name == "update_file":
         return '{"commit":{"sha":"change-commit"}}'
     if tool_name == "create_pull_request":
-        return '{"number":99,"html_url":"https://github.com/example/repo/pull/99","head_sha":"test-head-sha"}'
+        return '{"number":99,"html_url":"https://github.com/example/repo/pull/99",'
+                '"head_sha":"test-head-sha"}'
     if tool_name == "get_commit_checks":
-        return '{"ref":"test-head-sha","total_count":1,"checks":[{"name":"Tests","status":"completed","conclusion":"success","url":"https://github.com/example/check"}]}'
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
@@ -341,7 +341,8 @@ def test_reviewer_normalizes_unsafe_decision_and_confidence(monkeypatch) -> None
             return {
                 "decision": "unknown",
                 "summary": "Needs review.",
-                "findings": [{"severity": "urgent", "category": "safety", "message": "Check manually."}],
+        "verification_result": {"checks": [{"name": "Tests", "status": "completed",
+                "conclusion": "success"}]},
                 "confidence": 4.0,
             }
 
