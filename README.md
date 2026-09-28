@@ -30,31 +30,20 @@ flowchart TD
     P --> C[Code Agent]
     P --> T[Testing Agent]
     P --> V[Reviewer Agent]
-
     R --> MCP[MCP Tool Layer]
     C --> MCP
     T --> MCP
     V --> MCP
-
     MCP --> GH[GitHub]
-    MCP --> FS[Filesystem]
-    MCP --> TERM[Sandboxed Terminal]
-    MCP --> DB[Database]
-    MCP --> WEB[Web / Docs]
-
     G --> MEM[State + Memory]
     MEM --> PG[(PostgreSQL)]
     MEM --> REDIS[(Redis)]
-
     R --> SEARCH[Azure AI Search]
     SEARCH --> BLOB[Azure Blob Storage]
-
     G --> HITL{Human Approval}
     HITL -->|approved| MCP
     HITL -->|rejected| G
-
     G --> EVAL[Evaluation + Observability]
-    EVAL --> OTEL[OpenTelemetry / Tracing]
 ```
 
 ## Core capabilities
@@ -65,7 +54,7 @@ flowchart TD
 - **Human-in-the-loop** — risky mutations require explicit approval.
 - **Repository intelligence** — code search, file inspection, dependency analysis, and test execution.
 - **Grounded investigation** — retrieval and evidence are carried into agent decisions.
-- **Repository ingestion foundation** — deterministic metadata-aware chunking is ready for Blob-to-Search indexing.
+- **Repository indexing pipeline** — Azure Blob text ingestion, deterministic chunking, Azure OpenAI embeddings, and Azure AI Search document upserts are separated behind testable provider boundaries.
 - **Evaluation** — tool-call success, task completion, groundedness, latency, cost, recovery, and human intervention.
 - **Observability** — capture task events, evaluation metrics, and engineering outcomes.
 
@@ -91,21 +80,17 @@ flowchart TD
 ```text
 .
 ├── apps/
-│   ├── api/                 # FastAPI service
-│   └── web/                 # Next.js command center
-├── agents/                  # Agent roles and prompts
+├── agents/
 ├── core/
 │   ├── evaluation/          # Agent/task evaluation
 │   ├── memory/              # Working and persistent memory
-│   ├── retrieval/           # Repository ingestion and retrieval
+│   ├── retrieval/           # Blob ingestion, chunking, embeddings, indexing
 │   ├── security/            # Approval and tool policies
 │   └── state/               # LangGraph state
-├── tooling/                 # MCP-backed engineering tools
-│   └── github/              # GitHub MCP server and client
-├── infrastructure/          # Docker and deployment assets
-├── tests/                   # Unit/integration/evaluation tests
-├── docs/                    # Architecture and ADRs
-└── .github/workflows/       # CI/CD
+├── tooling/
+├── tests/
+├── docs/
+└── .github/workflows/
 ```
 
 ## Engineering principles
@@ -138,11 +123,11 @@ flowchart TD
 ### Phase 3 — Knowledge + memory
 - [x] PostgreSQL-backed LangGraph checkpoint foundation
 - [x] Optional Redis task snapshot store and health signal
-- [ ] Azure Blob ingestion
+- [x] Azure Blob ingestion adapter
 - [x] Repository retrieval abstraction
 - [x] Azure AI Search hybrid retrieval
 - [x] Deterministic repository chunking foundation
-- [ ] Embedding + indexing pipeline
+- [x] Embedding + indexing adapter foundation
 - [ ] Working memory
 - [ ] Long-term engineering knowledge
 - [ ] Repository-aware RAG
@@ -159,6 +144,4 @@ flowchart TD
 
 **Active development — production-style AI engineering platform.**
 
-The foundation is now implemented and the project has progressed beyond the initial architecture scaffold. The current system supports end-to-end engineering investigation: task planning with LangGraph, bounded repository investigation through MCP, evidence-backed root-cause analysis, confidence scoring, human approval before mutations, automated branch/PR creation, verification, reviewer/critic analysis, evaluation metrics, observability events, and a recruiter-facing Next.js Command Center.
-
-The current focus is **production hardening and deployment** — expanding live infrastructure integrations, strengthening evaluation and observability, improving security and tool isolation, and deploying the platform as a fully accessible application.
+The current repository knowledge layer has provider boundaries for Blob ingestion, chunking, embeddings, and Azure AI Search indexing. The next step is wiring these primitives into the LangGraph research path so investigations can use repository-aware RAG with explicit evidence and retrieval metadata.
