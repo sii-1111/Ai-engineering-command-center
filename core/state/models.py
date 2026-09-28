@@ -11,6 +11,7 @@ class EngineeringState(TypedDict, total=False):
     repository: str
     ref: str
     plan: list[str]
+    dynamic_plan: list[dict]
     current_step: int
     evidence: list[Evidence]
     findings: list[str]
