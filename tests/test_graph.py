@@ -120,7 +120,9 @@ def test_graph_resumes_after_approval(monkeypatch) -> None:
     assert paused["__interrupt__"]
     resumed = graph.invoke(Command(resume=True), config=config)
 
-    assert resumed["status"] == "verification_passed"
+    assert resumed["status"] == "review_approve"
+    assert resumed["review"]["decision"] == "approve"
+    assert resumed["verification_status"] == "passed"
     assert resumed["approval_status"] == "approved"
     assert resumed["report"]["approval_required"] is True
     assert resumed["change_branch"].startswith("ai-fix-")
