@@ -62,7 +62,7 @@ flowchart TD
 - **Evaluation** — tool-call success, task completion, groundedness, latency, cost, recovery, and human intervention.
 - **Observability** — capture task events, evaluation metrics, and engineering outcomes.
 
-## Planned stack
+## Current stack
 
 | Layer | Technology |
 |---|---|
@@ -92,11 +92,8 @@ flowchart TD
 │   ├── memory/              # Working and persistent memory
 │   ├── security/            # Approval and tool policies
 │   └── state/               # LangGraph state
-├── mcp/
-│   ├── github/              # Repository tools
-│   ├── filesystem/          # File tools
-│   ├── terminal/            # Sandboxed execution
-│   └── database/            # Database tools
+├── tooling/              # MCP-backed engineering tools
+│   └── github/              # GitHub MCP server and client
 ├── infrastructure/          # Docker and deployment assets
 ├── tests/                   # Unit/integration/evaluation tests
 ├── docs/                    # Architecture and ADRs
@@ -116,19 +113,19 @@ flowchart TD
 ## Roadmap
 
 ### Phase 1 — Engineering investigation
-- [ ] LangGraph state graph
-- [ ] GitHub MCP tools
-- [ ] Repository/code investigation
-- [ ] Terminal/test execution
-- [ ] Evidence-backed investigation report
+- [x] LangGraph state graph
+- [x] GitHub MCP tools
+- [x] Repository/code investigation
+- [x] Test/check verification
+- [x] Evidence-backed investigation report
 
 ### Phase 2 — Agentic orchestration
-- [ ] Planner
-- [ ] Research Agent
-- [ ] Code Agent
-- [ ] Testing Agent
-- [ ] Reviewer Agent
-- [ ] Interrupt/resume HITL flow
+- [x] Planner
+- [x] Research / investigation agent
+- [x] Code modification flow
+- [x] Verification flow
+- [x] Reviewer / Critic Agent
+- [x] Interrupt/resume HITL flow
 
 ### Phase 3 — Knowledge + memory
 - [ ] Azure Blob ingestion
@@ -142,11 +139,13 @@ flowchart TD
 - [x] Task observability events
 - [ ] Cost/latency dashboards
 - [ ] Dockerized services
-- [ ] CI/CD
+- [x] CI/CD validation
 - [ ] Azure deployment
 
 ## Project status
 
-**Foundation stage — architecture and repository scaffold.**
+**Active development — production-style AI engineering platform.**
 
-This repository intentionally starts with architecture and engineering contracts before implementation. The goal is to evolve it into a demonstrable production-style AI engineering system rather than a collection of disconnected AI demos.
+The foundation is now implemented and the project has progressed beyond the initial architecture scaffold. The current system supports end-to-end engineering investigation: task planning with LangGraph, bounded repository investigation through MCP, evidence-backed root-cause analysis, confidence scoring, human approval before mutations, automated branch/PR creation, verification, reviewer/critic analysis, evaluation metrics, observability events, and a recruiter-facing Next.js Command Center.
+
+The current focus is **production hardening and deployment** — expanding live infrastructure integrations, strengthening evaluation and observability, improving security and tool isolation, and deploying the platform as a fully accessible application.
