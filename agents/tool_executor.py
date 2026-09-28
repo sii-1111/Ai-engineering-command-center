@@ -78,7 +78,7 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
             "head": branch,
             "base": base,
         })
-    except Exception as exc:
+    except (ValueError, KeyError, RuntimeError) as exc:
         return {
             **state,
             "status": "change_failed",
