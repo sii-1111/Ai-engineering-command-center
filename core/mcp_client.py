@@ -2,9 +2,10 @@ import asyncio
 import os
 from typing import Any
 
-from core.security.tool_policy import DEFAULT_TOOL_POLICY
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from core.security.tool_policy import DEFAULT_TOOL_POLICY
 
 
 async def call_github_tool(
