@@ -54,7 +54,9 @@ def fake_github_tool(tool_name: str, arguments: dict) -> str:
     if tool_name == "update_file":
         return '{"commit":{"sha":"change-commit"}}'
     if tool_name == "create_pull_request":
-        return '{"number":99,"html_url":"https://github.com/example/repo/pull/99"}'
+        return '{"number":99,"html_url":"https://github.com/example/repo/pull/99","head_sha":"test-head-sha"}'
+    if tool_name == "get_commit_checks":
+        return '{"ref":"test-head-sha","total_count":1,"checks":[{"name":"Tests","status":"completed","conclusion":"success","url":"https://github.com/example/check"}]}'
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
@@ -106,7 +108,7 @@ def test_graph_resumes_after_approval(monkeypatch) -> None:
     assert paused["__interrupt__"]
     resumed = graph.invoke(Command(resume=True), config=config)
 
-    assert resumed["status"] == "change_applied"
+    assert resumed["status"] == "verification_passed"
     assert resumed["approval_status"] == "approved"
     assert resumed["report"]["approval_required"] is True
     assert resumed["change_branch"].startswith("ai-fix-")
@@ -231,3 +233,50 @@ def test_approved_change_creates_branch_updates_file_and_opens_pr(monkeypatch) -
         "create_branch", "read_file", "update_file", "create_pull_request"
     ]
     assert calls[2][1]["sha"] == "current-sha"
+
+
+def test_verify_change_passes_when_all_checks_succeed(monkeypatch) -> None:
+    def fake_checks(tool_name: str, arguments: dict) -> str:
+        assert tool_name == "get_commit_checks"
+        assert arguments["ref"] == "head-sha"
+        return '{"ref":"head-sha","total_count":2,"checks":['
+               '{"name":"Lint","status":"completed","conclusion":"success"},'
+               '{"name":"Tests","status":"completed","conclusion":"success"}]}'
+
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_checks)
+    result = tool_executor.verify_change({
+        "repository": "sii-1111/Ai-engineering-command-center",
+        "pull_request": {"head_sha": "head-sha"},
+    })
+    assert result["status"] == "verification_passed"
+    assert result["verification_status"] == "passed"
+    assert result["verification_result"]["passed"] is True
+
+
+def test_verify_change_stays_pending_while_checks_run(monkeypatch) -> None:
+    def fake_checks(tool_name: str, arguments: dict) -> str:
+        return '{"ref":"head-sha","total_count":1,"checks":['
+               '{"name":"Tests","status":"in_progress","conclusion":null}]}'
+
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_checks)
+    result = tool_executor.verify_change({
+        "repository": "sii-1111/Ai-engineering-command-center",
+        "pull_request": {"head_sha": "head-sha"},
+    })
+    assert result["status"] == "verification_pending"
+    assert result["verification_status"] == "pending"
+
+
+def test_verify_change_fails_when_a_check_fails(monkeypatch) -> None:
+    def fake_checks(tool_name: str, arguments: dict) -> str:
+        return '{"ref":"head-sha","total_count":1,"checks":['
+               '{"name":"Tests","status":"completed","conclusion":"failure"}]}'
+
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_checks)
+    result = tool_executor.verify_change({
+        "repository": "sii-1111/Ai-engineering-command-center",
+        "pull_request": {"head_sha": "head-sha"},
+    })
+    assert result["status"] == "verification_failed"
+    assert result["verification_status"] == "failed"
+    assert result["verification_result"]["failed_checks"][0]["name"] == "Tests"
