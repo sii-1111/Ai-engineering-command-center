@@ -2,8 +2,9 @@ import asyncio
 import os
 from typing import Any
 
-from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+
+from mcp import ClientSession, StdioServerParameters
 
 
 async def call_github_tool(tool_name: str, arguments: dict[str, Any]) -> str:
