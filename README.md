@@ -135,6 +135,8 @@ flowchart TD
 - [x] Interrupt/resume HITL flow
 
 ### Phase 3 — Knowledge + memory
+- [x] PostgreSQL-backed LangGraph checkpoint foundation
+- [x] Optional Redis task snapshot store and health signal
 - [ ] Azure Blob ingestion
 - [ ] Azure AI Search hybrid retrieval
 - [ ] Working memory
