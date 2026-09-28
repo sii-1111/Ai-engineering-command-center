@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
@@ -9,6 +10,13 @@ from core.evaluation import evaluate_task
 from core.graph import build_graph
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 graph = build_graph()
 
 
@@ -74,6 +82,14 @@ async def create_task(request: TaskRequest) -> dict:
         config=_config(task_id),
     )
     return _serialize_result(task_id, result)
+
+
+@app.get("/v1/tasks/{task_id}")
+async def get_task(task_id: str) -> dict:
+    state = graph.get_state(_config(task_id))
+    if not state.values:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _serialize_result(task_id, state.values)
 
 
 @app.post("/v1/tasks/{task_id}/approval")
