@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-
 RISK_LEVELS = {
     "read_file": "low",
     "search_code": "low",
