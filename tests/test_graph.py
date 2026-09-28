@@ -273,8 +273,10 @@ def test_verify_change_stays_pending_while_checks_run(monkeypatch) -> None:
 
 def test_verify_change_fails_when_a_check_fails(monkeypatch) -> None:
     def fake_checks(tool_name: str, arguments: dict) -> str:
-        return '{"ref":"head-sha","total_count":1,"checks":['
-               '{"name":"Tests","status":"completed","conclusion":"failure"}]}'
+        return (
+            '{"ref":"head-sha","total_count":1,"checks":['
+            '{"name":"Tests","status":"completed","conclusion":"failure"}]}'
+        )
 
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_checks)
     result = tool_executor.verify_change({
