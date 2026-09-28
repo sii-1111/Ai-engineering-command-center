@@ -9,9 +9,11 @@ class FakeEmbeddings:
                 self.embedding = embedding
 
         class Response:
-            data = [Item([float(i), float(i + 1)]) for i, _ in enumerate(input)]
+            def __init__(self, data):
+                self.data = data
 
-        return Response()
+        data = [Item([float(i), float(i + 1)]) for i, _ in enumerate(input)]
+        return Response(data)
 
 
 class FakeClient:
