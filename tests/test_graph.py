@@ -68,6 +68,7 @@ def test_graph_pauses_for_human_approval(monkeypatch) -> None:
     FakeLLM.calls = 0
     monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
+    monkeypatch.setattr("agents.reviewer.LLM", FakeLLM)
 
     graph = build_graph()
     result = graph.invoke({
