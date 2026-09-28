@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from agents import llm_planner, tool_executor
 from core.graph import build_graph
 
@@ -37,12 +39,17 @@ def fake_github_tool(tool_name: str, arguments: dict) -> str:
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
-def test_graph_produces_evidence_backed_root_cause(monkeypatch) -> None:
+def _config() -> dict:
+    return {"configurable": {"thread_id": str(uuid4())}}
+
+
+def test_graph_pauses_for_human_approval(monkeypatch) -> None:
     FakeLLM.calls = 0
     monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
 
-    result = build_graph().invoke({
+    graph = build_graph()
+    result = graph.invoke({
         "task": "Find the search implementation.",
         "repository": "sii-1111/Ai-engineering-command-center",
         "ref": "main",
@@ -50,14 +57,63 @@ def test_graph_produces_evidence_backed_root_cause(monkeypatch) -> None:
         "findings": [],
         "tool_calls": [],
         "status": "started",
-    })
+    }, config=_config())
 
-    assert result["status"] == "completed"
+    assert result["status"] == "report_ready"
     assert result["report"]["confidence"] == 0.9
-    assert result["report"]["evidence"] == [result["evidence"][0]["detail"]]
     assert result["report"]["approval_required"] is True
-    assert "Confidence: 0.90" in result["final_report"]
+    assert result["__interrupt__"][0].value["type"] == "approval_required"
+    assert result["__interrupt__"][0].value["report"]["confidence"] == 0.9
     assert FakeLLM.calls == 2
+
+
+def test_graph_resumes_after_approval(monkeypatch) -> None:
+    FakeLLM.calls = 0
+    monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
+
+    graph = build_graph()
+    config = _config()
+    paused = graph.invoke({
+        "task": "Find the search implementation.",
+        "repository": "sii-1111/Ai-engineering-command-center",
+        "ref": "main",
+        "evidence": [],
+        "findings": [],
+        "tool_calls": [],
+        "status": "started",
+    }, config=config)
+
+    assert paused["__interrupt__"]
+    resumed = graph.invoke(Command(resume=True), config=config)
+
+    assert resumed["status"] == "approved"
+    assert resumed["approval_status"] == "approved"
+    assert resumed["report"]["approval_required"] is True
+    assert "__interrupt__" not in resumed
+
+
+def test_graph_stops_after_rejection(monkeypatch) -> None:
+    FakeLLM.calls = 0
+    monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
+
+    graph = build_graph()
+    config = _config()
+    graph.invoke({
+        "task": "Find the search implementation.",
+        "repository": "sii-1111/Ai-engineering-command-center",
+        "ref": "main",
+        "evidence": [],
+        "findings": [],
+        "tool_calls": [],
+        "status": "started",
+    }, config=config)
+
+    rejected = graph.invoke(Command(resume=False), config=config)
+
+    assert rejected["status"] == "rejected"
+    assert rejected["approval_status"] == "rejected"
 
 
 def test_report_rejects_unsupported_evidence_and_clamps_confidence(monkeypatch) -> None:
@@ -94,7 +150,7 @@ def test_report_rejects_unsupported_evidence_and_clamps_confidence(monkeypatch) 
         "findings": [],
         "tool_calls": [],
         "status": "started",
-    })
+    }, config=_config())
 
     assert result["report"]["evidence"] == []
     assert result["report"]["confidence"] == 1.0
@@ -111,7 +167,7 @@ def test_graph_requires_repository(monkeypatch) -> None:
             "findings": [],
             "tool_calls": [],
             "status": "started",
-        })
+        }, config=_config())
     except KeyError as exc:
         assert str(exc).strip("'") == "repository"
     else:
