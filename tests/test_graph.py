@@ -1,7 +1,6 @@
 from agents import llm_planner, tool_executor
 from core.graph import build_graph
 
-
 SEARCH_EVIDENCE = (
     '{"query":"Find the search implementation.",'
     '"matches":[{"path":"apps/api/app/main.py","sha":"abc"}]}'
