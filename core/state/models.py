@@ -35,3 +35,5 @@ class EngineeringState(TypedDict, total=False):
     change_branch: str
     change_result: dict
     pull_request: dict
+    verification_status: str
+    verification_result: dict
