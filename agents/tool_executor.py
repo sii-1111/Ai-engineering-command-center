@@ -63,7 +63,7 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
         if not current_sha:
             raise ValueError("Unable to resolve current file SHA.")
 
-        update_result = call_github_tool_sync("update_file", {
+        update_raw = call_github_tool_sync("update_file", {
             "repository": repository,
             "path": path,
             "content": str(plan.get("content", "")),
@@ -71,7 +71,7 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
             "message": str(plan.get("commit_message", "feat: apply approved engineering change")),
             "sha": current_sha,
         })
-        pr_result = call_github_tool_sync("create_pull_request", {
+        pr_raw = call_github_tool_sync("create_pull_request", {
             "repository": repository,
             "title": str(plan.get("pr_title", "feat: apply approved engineering change")),
             "body": str(plan.get("pr_body", "")),
@@ -90,6 +90,6 @@ def execute_approved_change(state: EngineeringState) -> EngineeringState:
         **state,
         "status": "change_applied",
         "change_branch": branch,
-        "change_result": update_result,
-        "pull_request": pr_result,
+        "change_result": json.loads(update_raw),
+        "pull_request": json.loads(pr_raw),
     }
