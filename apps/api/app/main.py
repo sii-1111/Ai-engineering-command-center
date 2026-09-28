@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from agents.tool_executor import verify_change
 from core.evaluation import evaluate_task
+from core.observability import record_event
 from core.graph import build_graph
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
@@ -69,6 +70,7 @@ async def create_task(request: TaskRequest) -> dict:
             "findings": [],
             "tool_calls": [],
             "status": "started",
+            "observability_events": [{"timestamp": "task-created", "event": "task_started"}],
         },
         config=_config(task_id),
     )
