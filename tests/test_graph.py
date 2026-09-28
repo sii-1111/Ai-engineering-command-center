@@ -70,7 +70,7 @@ def test_graph_pauses_for_human_approval(monkeypatch) -> None:
         "status": "started",
     }, config=_config())
 
-    assert result["status"] == "report_ready"
+    assert result["status"] == "awaiting_approval"
     assert result["report"]["confidence"] == 0.9
     assert result["report"]["approval_required"] is True
     assert result["__interrupt__"][0].value["type"] == "approval_required"
@@ -98,9 +98,10 @@ def test_graph_resumes_after_approval(monkeypatch) -> None:
     assert paused["__interrupt__"]
     resumed = graph.invoke(Command(resume=True), config=config)
 
-    assert resumed["status"] == "approved"
+    assert resumed["status"] == "change_applied"
     assert resumed["approval_status"] == "approved"
     assert resumed["report"]["approval_required"] is True
+    assert resumed["change_branch"].startswith("ai-fix-")
     assert "__interrupt__" not in resumed
 
 
