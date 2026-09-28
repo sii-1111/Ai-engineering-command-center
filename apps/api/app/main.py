@@ -1,15 +1,47 @@
-from fastapi import FastAPI
+from uuid import uuid4
+
+from fastapi import FastAPI, HTTPException
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from core.graph import build_graph
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
+graph = build_graph()
 
 
 class TaskRequest(BaseModel):
     task: str = Field(min_length=1)
     repository: str = Field(pattern=r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
     ref: str = "main"
+
+
+class ApprovalRequest(BaseModel):
+    approved: bool
+
+
+def _config(task_id: str) -> dict:
+    return {"configurable": {"thread_id": task_id}}
+
+
+def _serialize_result(task_id: str, result: dict) -> dict:
+    interrupts = result.get("__interrupt__", ())
+    if interrupts:
+        request = interrupts[0].value
+        return {
+            "task_id": task_id,
+            "status": "awaiting_approval",
+            "approval_request": request,
+            "report": result.get("report", {}),
+            "final_report": result.get("final_report", ""),
+        }
+    return {
+        "task_id": task_id,
+        "status": result.get("status", "completed"),
+        "report": result.get("report", {}),
+        "final_report": result.get("final_report", ""),
+        "approval_status": result.get("approval_status", "not_required"),
+    }
 
 
 @app.get("/health")
@@ -19,12 +51,27 @@ async def health() -> dict[str, str]:
 
 @app.post("/v1/tasks")
 async def create_task(request: TaskRequest) -> dict:
-    return build_graph().invoke({
-        "task": request.task,
-        "repository": request.repository,
-        "ref": request.ref,
-        "evidence": [],
-        "findings": [],
-        "tool_calls": [],
-        "status": "started",
-    })
+    task_id = str(uuid4())
+    result = graph.invoke(
+        {
+            "task": request.task,
+            "repository": request.repository,
+            "ref": request.ref,
+            "evidence": [],
+            "findings": [],
+            "tool_calls": [],
+            "status": "started",
+        },
+        config=_config(task_id),
+    )
+    return _serialize_result(task_id, result)
+
+
+@app.post("/v1/tasks/{task_id}/approval")
+async def submit_approval(task_id: str, request: ApprovalRequest) -> dict:
+    state = graph.get_state(_config(task_id))
+    if not state.values:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    result = graph.invoke(Command(resume=request.approved), config=_config(task_id))
+    return _serialize_result(task_id, result)
