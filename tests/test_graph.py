@@ -2,6 +2,12 @@ from agents import llm_planner, tool_executor
 from core.graph import build_graph
 
 
+SEARCH_EVIDENCE = (
+    '{"query":"Find the search implementation.",'
+    '"matches":[{"path":"apps/api/app/main.py","sha":"abc"}]}'
+)
+
+
 class FakeLLM:
     calls = 0
 
@@ -16,7 +22,7 @@ class FakeLLM:
             "action": "finish",
             "report": {
                 "root_cause": "The search endpoint is implemented in the identified file.",
-                "evidence": ["{\\"query\\":\\"Find the search implementation.\\",\\"matches\\":[{\\"path\\":\\"apps/api/app/main.py\\",\\"sha\\":\\"abc\\"}]}"],
+                "evidence": [SEARCH_EVIDENCE],
                 "impact": "The identified endpoint is the relevant investigation target.",
                 "recommended_change": "Inspect and optimize the identified implementation.",
                 "files_involved": ["apps/api/app/main.py"],
@@ -28,7 +34,7 @@ class FakeLLM:
 
 def fake_github_tool(tool_name: str, arguments: dict) -> str:
     if tool_name == "search_code":
-        return '{"query":"Find the search implementation.","matches":[{"path":"apps/api/app/main.py","sha":"abc"}]}'
+        return SEARCH_EVIDENCE
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
@@ -62,7 +68,10 @@ def test_report_rejects_unsupported_evidence_and_clamps_confidence(monkeypatch) 
         def invoke_json(self, messages: list[dict[str, str]]) -> dict:
             UnsafeFakeLLM.calls += 1
             if UnsafeFakeLLM.calls == 1:
-                return {"tool": "search_code", "arguments": {"query": "Find the search implementation."}}
+                return {
+                    "tool": "search_code",
+                    "arguments": {"query": "Find the search implementation."},
+                }
             return {
                 "action": "finish",
                 "report": {
