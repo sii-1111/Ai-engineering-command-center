@@ -1,17 +1,35 @@
-from agents import github_investigator
+from agents import tool_executor
+from agents.llm_planner import LLM
 from core.graph import build_graph
+
+
+class FakeLLM:
+    def invoke_json(self, messages: list[dict[str, str]]) -> dict:
+        return {
+            "steps": [
+                {
+                    "tool": "search_code",
+                    "arguments": {"query": "Find the search implementation."},
+                },
+                {
+                    "tool": "list_repository",
+                    "arguments": {"path": ""},
+                },
+            ]
+        }
 
 
 def fake_github_tool(tool_name: str, arguments: dict) -> str:
     if tool_name == "search_code":
-        return '{"query":"test task","matches":[{"path":"apps/api/app/main.py","sha":"abc"}]}'
+        return '{"query":"Find the search implementation.","matches":[{"path":"apps/api/app/main.py","sha":"abc"}]}'
     if tool_name == "list_repository":
         return '[{"name":"apps","path":"apps","type":"dir"},{"name":"README.md","path":"README.md","type":"file"}]'
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
 def test_graph_runs_github_investigation(monkeypatch) -> None:
-    monkeypatch.setattr(github_investigator, "call_github_tool_sync", fake_github_tool)
+    monkeypatch.setattr("agents.llm_planner.LLM", FakeLLM)
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
 
     result = build_graph().invoke({
         "task": "Find the search implementation.",
@@ -24,16 +42,16 @@ def test_graph_runs_github_investigation(monkeypatch) -> None:
     })
 
     assert result["status"] == "completed"
-    assert result["findings"] == [
-        "GitHub code search returned 1 matching file(s): ['apps/api/app/main.py']"
-    ]
+    assert len(result["dynamic_plan"]) == 2
     assert len(result["tool_calls"]) == 2
-    assert len(result["evidence"]) == 3
+    assert len(result["evidence"]) == 2
+    assert result["tool_calls"][0]["tool"] == "github.search_code"
+    assert result["tool_calls"][1]["tool"] == "github.list_repository"
 
 
 def test_graph_requires_repository(monkeypatch) -> None:
-    # The API validates repository input; the graph itself expects it at runtime.
-    monkeypatch.setattr(github_investigator, "call_github_tool_sync", fake_github_tool)
+    monkeypatch.setattr("agents.llm_planner.LLM", FakeLLM)
+    monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
     try:
         build_graph().invoke({
             "task": "Find the search implementation.",
