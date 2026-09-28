@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from agents.tool_executor import verify_change
 from core.evaluation import evaluate_task
 from core.graph import build_graph
+from core.store.redis import get_task_snapshot, healthcheck as redis_healthcheck, save_task_snapshot
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
 app.add_middleware(
@@ -62,7 +63,7 @@ def _serialize_result(task_id: str, result: dict) -> dict:
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "redis": redis_healthcheck()}
 
 
 @app.post("/v1/tasks")
@@ -81,6 +82,7 @@ async def create_task(request: TaskRequest) -> dict:
         },
         config=_config(task_id),
     )
+    save_task_snapshot(task_id, result)
     return _serialize_result(task_id, result)
 
 
