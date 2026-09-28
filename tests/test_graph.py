@@ -1,33 +1,40 @@
-from agents import tool_executor
+from agents import llm_planner, tool_executor
 from core.graph import build_graph
 
 
 class FakeLLM:
+    calls = 0
+
     def invoke_json(self, messages: list[dict[str, str]]) -> dict:
+        FakeLLM.calls += 1
+        if FakeLLM.calls == 1:
+            return {
+                "tool": "search_code",
+                "arguments": {"query": "Find the search implementation."},
+            }
         return {
-            "steps": [
-                {
-                    "tool": "search_code",
-                    "arguments": {"query": "Find the search implementation."},
-                },
-                {
-                    "tool": "list_repository",
-                    "arguments": {"path": ""},
-                },
-            ]
+            "action": "finish",
+            "report": {
+                "root_cause": "Search implementation was identified in the evidence.",
+                "evidence": ["apps/api/app/main.py contains the endpoint."],
+                "impact": "The endpoint is the relevant investigation target.",
+                "recommended_change": "Inspect and optimize the identified implementation.",
+                "files_involved": ["apps/api/app/main.py"],
+                "confidence": 0.9,
+                "approval_required": False,
+            },
         }
 
 
 def fake_github_tool(tool_name: str, arguments: dict) -> str:
     if tool_name == "search_code":
         return '{"query":"Find the search implementation.","matches":[{"path":"apps/api/app/main.py","sha":"abc"}]}'
-    if tool_name == "list_repository":
-        return '[{"name":"apps","path":"apps","type":"dir"},{"name":"README.md","path":"README.md","type":"file"}]'
     raise AssertionError(f"Unexpected tool: {tool_name}")
 
 
-def test_graph_runs_github_investigation(monkeypatch) -> None:
-    monkeypatch.setattr("agents.llm_planner.LLM", FakeLLM)
+def test_graph_runs_bounded_iterative_investigation(monkeypatch) -> None:
+    FakeLLM.calls = 0
+    monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
 
     result = build_graph().invoke({
@@ -41,15 +48,17 @@ def test_graph_runs_github_investigation(monkeypatch) -> None:
     })
 
     assert result["status"] == "completed"
-    assert len(result["dynamic_plan"]) == 2
-    assert len(result["tool_calls"]) == 2
-    assert len(result["evidence"]) == 2
+    assert len(result["tool_calls"]) == 1
+    assert len(result["evidence"]) == 1
     assert result["tool_calls"][0]["tool"] == "github.search_code"
-    assert result["tool_calls"][1]["tool"] == "github.list_repository"
+    assert result["report"]["confidence"] == 0.9
+    assert "Root Cause:" in result["final_report"]
+    assert FakeLLM.calls == 2
 
 
 def test_graph_requires_repository(monkeypatch) -> None:
-    monkeypatch.setattr("agents.llm_planner.LLM", FakeLLM)
+    FakeLLM.calls = 0
+    monkeypatch.setattr(llm_planner, "LLM", FakeLLM)
     monkeypatch.setattr(tool_executor, "call_github_tool_sync", fake_github_tool)
     try:
         build_graph().invoke({
