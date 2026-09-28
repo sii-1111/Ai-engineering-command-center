@@ -31,3 +31,7 @@ class EngineeringState(TypedDict, total=False):
     report: EngineeringReport
     approval_status: str
     approval_request: dict
+    change_plan: dict
+    change_branch: str
+    change_result: dict
+    pull_request: dict

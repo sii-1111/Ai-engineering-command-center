@@ -1,9 +1,10 @@
+
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from agents.llm_planner import build_dynamic_plan, decide_next_action
-from agents.tool_executor import execute_next_tool
+from agents.llm_planner import build_dynamic_plan, decide_next_action, prepare_change_plan
+from agents.tool_executor import execute_approved_change, execute_next_tool
 from core.state.models import EngineeringState
 
 _CHECKPOINTER = InMemorySaver()
@@ -36,21 +37,24 @@ def approval_gate(state: EngineeringState) -> EngineeringState:
     if not report.get("approval_required", False):
         return {**state, "approval_status": "not_required", "status": "completed"}
 
+    plan = state.get("change_plan", {})
     decision = interrupt({
         "type": "approval_required",
-        "message": "Human approval is required before any code, configuration, data, or infrastructure change.",
+        "message": "Approve this exact change plan before any repository write.",
         "report": report,
+        "change_plan": plan,
     })
     approved = bool(decision)
     return {
         **state,
         "approval_status": "approved" if approved else "rejected",
         "status": "approved" if approved else "rejected",
-        "approval_request": {
-            "type": "approval_required",
-            "decision": approved,
-        },
+        "approval_request": {"type": "approval_required", "decision": approved},
     }
+
+
+def route_after_approval(state: EngineeringState) -> str:
+    return "execute_change" if state.get("approval_status") == "approved" else END
 
 
 def build_graph():
@@ -59,11 +63,15 @@ def build_graph():
     graph.add_node("execute_tool", execute_next_tool)
     graph.add_node("decide_next", decide_next_action)
     graph.add_node("report", produce_report)
+    graph.add_node("prepare_change", prepare_change_plan)
     graph.add_node("approval_gate", approval_gate)
+    graph.add_node("execute_change", execute_approved_change)
     graph.add_edge(START, "planner")
     graph.add_edge("planner", "execute_tool")
     graph.add_edge("execute_tool", "decide_next")
     graph.add_conditional_edges("decide_next", route_after_decision)
-    graph.add_edge("report", "approval_gate")
-    graph.add_edge("approval_gate", END)
+    graph.add_edge("report", "prepare_change")
+    graph.add_edge("prepare_change", "approval_gate")
+    graph.add_conditional_edges("approval_gate", route_after_approval)
+    graph.add_edge("execute_change", END)
     return graph.compile(checkpointer=_CHECKPOINTER)
