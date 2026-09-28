@@ -63,7 +63,7 @@ def _serialize_result(task_id: str, result: dict) -> dict:
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
+async def health() -> dict[str, object]:
     return {"status": "ok", "redis": redis_healthcheck()}
 
 
