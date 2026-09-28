@@ -20,7 +20,6 @@ Explore the repository architecture interactively in GitDiagram:
 
 [Open AI Engineering Command Center in GitDiagram](https://gitdiagram.com/sii-1111/Ai-engineering-command-center)
 
-
 ```mermaid
 flowchart TD
     U[Engineer] --> UI[Web Command Center]
@@ -66,6 +65,7 @@ flowchart TD
 - **Human-in-the-loop** — risky mutations require explicit approval.
 - **Repository intelligence** — code search, file inspection, dependency analysis, and test execution.
 - **Grounded investigation** — retrieval and evidence are carried into agent decisions.
+- **Repository ingestion foundation** — deterministic metadata-aware chunking is ready for Blob-to-Search indexing.
 - **Evaluation** — tool-call success, task completion, groundedness, latency, cost, recovery, and human intervention.
 - **Observability** — capture task events, evaluation metrics, and engineering outcomes.
 
@@ -97,9 +97,10 @@ flowchart TD
 ├── core/
 │   ├── evaluation/          # Agent/task evaluation
 │   ├── memory/              # Working and persistent memory
+│   ├── retrieval/           # Repository ingestion and retrieval
 │   ├── security/            # Approval and tool policies
 │   └── state/               # LangGraph state
-├── tooling/              # MCP-backed engineering tools
+├── tooling/                 # MCP-backed engineering tools
 │   └── github/              # GitHub MCP server and client
 ├── infrastructure/          # Docker and deployment assets
 ├── tests/                   # Unit/integration/evaluation tests
@@ -140,6 +141,8 @@ flowchart TD
 - [ ] Azure Blob ingestion
 - [x] Repository retrieval abstraction
 - [x] Azure AI Search hybrid retrieval
+- [x] Deterministic repository chunking foundation
+- [ ] Embedding + indexing pipeline
 - [ ] Working memory
 - [ ] Long-term engineering knowledge
 - [ ] Repository-aware RAG
