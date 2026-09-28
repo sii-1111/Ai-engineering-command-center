@@ -1,5 +1,7 @@
 from typing import Any
 
+from core.observability import record_event
+
 
 def evaluate_task(state: dict[str, Any]) -> dict[str, Any]:
     report = state.get("report", {})
@@ -34,4 +36,5 @@ def evaluate_task(state: dict[str, Any]) -> dict[str, Any]:
             "event_count": len(events),
         },
     }
-    return {**state, "evaluation": evaluation, "status": state.get("status", "completed")}
+    updated = record_event(state, "evaluation_completed", metrics=evaluation)
+    return {**updated, "evaluation": evaluation, "status": state.get("status", "completed")}
