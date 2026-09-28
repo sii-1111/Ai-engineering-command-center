@@ -51,3 +51,5 @@ class EngineeringState(TypedDict, total=False):
     verification_status: str
     verification_result: dict
     review: ReviewResult
+    observability_events: list[dict]
+    evaluation: dict
