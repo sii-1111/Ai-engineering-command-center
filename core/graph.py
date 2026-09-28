@@ -1,4 +1,4 @@
-from langgraph.checkpoint.memory import InMemorySaver
+import os\n\nfrom langgraph.checkpoint.memory import InMemorySaver\nfrom langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
@@ -8,7 +8,21 @@ from agents.tool_executor import execute_approved_change, execute_next_tool, ver
 from core.evaluation import evaluate_task
 from core.state.models import EngineeringState
 
-_CHECKPOINTER = InMemorySaver()
+_CHECKPOINTER_CONTEXT = None
+
+
+def _build_checkpointer():
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        return InMemorySaver()
+    global _CHECKPOINTER_CONTEXT
+    _CHECKPOINTER_CONTEXT = PostgresSaver.from_conn_string(database_url)
+    checkpointer = _CHECKPOINTER_CONTEXT.__enter__()
+    checkpointer.setup()
+    return checkpointer
+
+
+_CHECKPOINTER = _build_checkpointer()
 
 
 def route_after_decision(state: EngineeringState) -> str:
