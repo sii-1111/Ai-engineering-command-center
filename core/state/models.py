@@ -18,3 +18,4 @@ class EngineeringState(TypedDict, total=False):
     tool_calls: list[dict]
     status: str
     final_report: str
+    report: dict
