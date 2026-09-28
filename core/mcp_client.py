@@ -2,10 +2,10 @@ import asyncio
 import os
 from typing import Any
 
+from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from mcp import ClientSession, StdioServerParameters
-from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolPermissionError
+from core.security.tool_policy import DEFAULT_TOOL_POLICY
 
 
 async def call_github_tool(
@@ -22,7 +22,7 @@ async def call_github_tool(
     async with stdio_client(server) as (read, write), ClientSession(read, write) as session:
         await session.initialize()
         result = await session.call_tool(tool_name, arguments)
-        return "\\n".join(c.text for c in result.content if getattr(c, "text", None))
+        return "\n".join(c.text for c in result.content if getattr(c, "text", None))
 
 
 def call_github_tool_sync(
