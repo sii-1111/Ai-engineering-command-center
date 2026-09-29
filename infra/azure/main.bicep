@@ -9,6 +9,9 @@ param namePrefix string = 'aicc'
 @description('Deploy Container Apps after images and secrets are available.')
 param deployApps bool = false
 
+@description('Enable private networking for PostgreSQL, Key Vault, and ACR. Requires Premium ACR.')
+param enablePrivateNetworking bool = true
+
 @description('PostgreSQL administrator login.')
 param postgresAdminLogin string = 'aiccadmin'
 
@@ -69,6 +72,11 @@ var keyVaultName = '${namePrefix}-kv-${take(suffix, 8)}'
 var postgresName = '${namePrefix}-pg-${take(suffix, 8)}'
 var redisName = '${namePrefix}-redis-${take(suffix, 8)}'
 var identityName = '${namePrefix}-runtime-${take(suffix, 8)}'
+var vnetName = '${namePrefix}-vnet-${take(suffix, 6)}'
+var acaSubnetName = 'aca-infra'
+var postgresSubnetName = 'postgres'
+var privateEndpointSubnetName = 'private-endpoints'
+var postgresDnsName = '${namePrefix}.postgres.database.azure.com'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logName
@@ -85,12 +93,53 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: acrName
   location: location
   sku: {
-    name: 'Basic'
+    name: enablePrivateNetworking ? 'Premium' : 'Basic'
   }
   properties: {
     adminUserEnabled: false
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
   }
+}
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
+  name: vnetName
+  location: location
+  properties: {
+    addressSpace: { addressPrefixes: [ '10.40.0.0/16' ] }
+    subnets: [
+      { name: acaSubnetName properties: { addressPrefix: '10.40.0.0/23' delegations: [{ name: 'container-apps' properties: { serviceName: 'Microsoft.App/environments' } }] } }
+      { name: postgresSubnetName properties: { addressPrefix: '10.40.2.0/28' delegations: [{ name: 'postgres-flexible-server' properties: { serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers' } }] } }
+      { name: privateEndpointSubnetName properties: { addressPrefix: '10.40.3.0/27' privateEndpointNetworkPolicies: 'Disabled' } }
+    ]
+  }
+}
+
+resource postgresPrivateDns 'Microsoft.Network/privateDnsZones@2024-06-01' = if (enablePrivateNetworking) {
+  name: postgresDnsName
+  location: 'global'
+}
+resource postgresDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (enablePrivateNetworking) {
+  parent: postgresPrivateDns
+  name: 'vnet-link'
+  properties: { registrationEnabled: false virtualNetwork: { id: vnet.id } }
+}
+resource acrPrivateDns 'Microsoft.Network/privateDnsZones@2024-06-01' = if (enablePrivateNetworking) {
+  name: 'privatelink.azurecr.io'
+  location: 'global'
+}
+resource acrDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (enablePrivateNetworking) {
+  parent: acrPrivateDns
+  name: 'vnet-link'
+  properties: { registrationEnabled: false virtualNetwork: { id: vnet.id } }
+}
+resource keyVaultPrivateDns 'Microsoft.Network/privateDnsZones@2024-06-01' = if (enablePrivateNetworking) {
+  name: 'privatelink.vaultcore.azure.net'
+  location: 'global'
+}
+resource keyVaultDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-06-01' = if (enablePrivateNetworking) {
+  parent: keyVaultPrivateDns
+  name: 'vnet-link'
+  properties: { registrationEnabled: false virtualNetwork: { id: vnet.id } }
 }
 
 resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
@@ -134,7 +183,9 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
       mode: 'Disabled'
     }
     network: {
-      publicNetworkAccess: 'Enabled'
+      publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+      delegatedSubnetResourceId: enablePrivateNetworking ? resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, postgresSubnetName) : null
+      privateDnsZoneArmResourceId: enablePrivateNetworking ? postgresPrivateDns.id : null
     }
   }
 }
@@ -148,13 +199,40 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2
   }
 }
 
-resource postgresAzureServicesFirewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = {
+resource postgresAzureServicesFirewall 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = if (!enablePrivateNetworking) {
   parent: postgres
   name: 'AllowAzureServices'
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
   }
+}
+
+resource acrPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = if (enablePrivateNetworking) {
+  name: '${namePrefix}-acr-pe-${take(suffix, 6)}'
+  location: location
+  properties: {
+    subnet: { id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, privateEndpointSubnetName) }
+    privateLinkServiceConnections: [{ name: 'acr' properties: { privateLinkServiceId: registry.id groupIds: [ 'registry' ] } }]
+  }
+}
+resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = if (enablePrivateNetworking) {
+  name: '${namePrefix}-kv-pe-${take(suffix, 6)}'
+  location: location
+  properties: {
+    subnet: { id: resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, privateEndpointSubnetName) }
+    privateLinkServiceConnections: [{ name: 'keyvault' properties: { privateLinkServiceId: keyVault.id groupIds: [ 'vault' ] } }]
+  }
+}
+resource acrPrivateDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (enablePrivateNetworking) {
+  parent: acrPrivateEndpoint
+  name: 'default'
+  properties: { privateDnsZoneConfigs: [{ name: 'acr' properties: { privateDnsZoneId: acrPrivateDns.id } }] }
+}
+resource keyVaultPrivateDnsGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = if (enablePrivateNetworking) {
+  parent: keyVaultPrivateEndpoint
+  name: 'default'
+  properties: { privateDnsZoneConfigs: [{ name: 'keyvault' properties: { privateDnsZoneId: keyVaultPrivateDns.id } }] }
 }
 
 resource redis 'Microsoft.Cache/redisEnterprise@2025-04-01' = {
@@ -191,6 +269,10 @@ resource containerEnvironment 'Microsoft.App/managedEnvironments@2025-07-01' = {
         customerId: logAnalytics.properties.customerId
         sharedKey: logAnalytics.listKeys().primarySharedKey
       }
+    }
+    vnetConfiguration: {
+      infrastructureSubnetId: resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, acaSubnetName)
+      internal: false
     }
   }
 }
