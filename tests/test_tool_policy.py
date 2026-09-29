@@ -7,6 +7,7 @@ from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolPermissionError
 def test_research_agent_is_read_only():
     assert DEFAULT_TOOL_POLICY.authorize("research_agent", "read_file").allowed
     assert DEFAULT_TOOL_POLICY.authorize("research_agent", "search_code").allowed
+    assert DEFAULT_TOOL_POLICY.authorize("research_agent", "search_repository_rag").allowed
     assert not DEFAULT_TOOL_POLICY.authorize("research_agent", "update_file").allowed
 
 
