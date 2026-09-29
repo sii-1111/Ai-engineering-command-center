@@ -44,7 +44,7 @@ def record_tool_event(
         state,
         "tool_completed",
         tool=tool,
-        duration_ms=round(duration_ms, 2),
+        duration_ms=duration_ms,
         success=success,
         **metadata,
     )
