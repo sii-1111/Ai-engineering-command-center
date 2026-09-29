@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from apps.api.observability import get_task_observability
+from apps.api.app.observability import get_task_observability
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
