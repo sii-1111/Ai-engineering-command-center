@@ -57,6 +57,7 @@ flowchart TD
 - **Repository indexing pipeline** — Azure Blob text ingestion, deterministic chunking, Azure OpenAI embeddings, and Azure AI Search document upserts are separated behind testable provider boundaries.
 - **Evaluation** — tool-call success, task completion, groundedness, latency, cost, recovery, and human intervention.
 - **Observability** — capture task events, evaluation metrics, and engineering outcomes.
+- **Asynchronous execution** — Redis-backed jobs are consumed by a dedicated worker process with durable task/job status transitions and failure recording.
 
 ## Current stack
 
@@ -140,6 +141,7 @@ flowchart TD
 - [x] Dockerized services
 - [x] CI/CD validation
 - [ ] Enterprise authentication and RBAC
+- [x] Production async task worker
 - [ ] Azure deployment
 
 ## Project status
