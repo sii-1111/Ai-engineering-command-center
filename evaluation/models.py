@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+
 @dataclass(frozen=True)
 class BenchmarkCase:
     case_id: str
@@ -9,6 +10,7 @@ class BenchmarkCase:
     expected_tools: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass(frozen=True)
 class EvaluationResult:
