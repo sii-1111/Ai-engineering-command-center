@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
-from apps.api.observability import get_task_observability
 from agents.tool_executor import verify_change
+from apps.api.observability import get_task_observability
 from core.evaluation import evaluate_task
 from core.graph import build_graph
 from core.store.jobs import JobStore
