@@ -3,7 +3,8 @@ from uuid import uuid4
 
 from core.mcp_client import call_github_tool_sync
 from core.observability import record_event
-from core.retrieval.search import search_repository\nfrom core.retrieval.knowledge import search_engineering_knowledge
+from core.retrieval.knowledge import search_engineering_knowledge
+from core.retrieval.search import search_repository
 from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolPermissionError
 from core.state.models import EngineeringState
 
