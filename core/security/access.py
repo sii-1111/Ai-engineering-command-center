@@ -1,9 +1,8 @@
 """Request-level authentication and least-privilege authorization."""
 
-from dataclasses import dataclass
 import hashlib
 import os
-from typing import Any
+from dataclasses import dataclass
 
 from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolDecision
 
