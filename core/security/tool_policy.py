@@ -4,6 +4,7 @@ RISK_LEVELS = {
     "read_file": "low",
     "search_code": "low",
     "list_repository": "low",
+    "search_repository_rag": "low",
     "get_commit_checks": "low",
     "create_branch": "medium",
     "update_file": "high",
@@ -12,7 +13,13 @@ RISK_LEVELS = {
 }
 
 AGENT_TOOL_ALLOWLIST = {
-    "research_agent": {"search_code", "read_file", "list_repository", "get_commit_checks"},
+    "research_agent": {
+        "search_code",
+        "read_file",
+        "list_repository",
+        "search_repository_rag",
+        "get_commit_checks",
+    },
     "code_agent": {"read_file", "create_branch", "update_file", "create_pull_request"},
     "reviewer_agent": {"search_code", "read_file", "list_repository", "get_commit_checks"},
     "verification_agent": {"get_commit_checks"},

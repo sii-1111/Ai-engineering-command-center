@@ -5,6 +5,7 @@ from core.retrieval.embedding import AzureOpenAIEmbeddingProvider, EmbeddingProv
 from core.retrieval.indexing import build_search_documents
 from core.retrieval.ingestion import RepositoryChunk, RepositoryFile, chunk_repository_file
 from core.retrieval.repository import RepositoryRetriever, RetrievalDocument
+from core.retrieval.search import search_repository
 
 __all__ = [
     "AzureBlobConfig",
@@ -20,4 +21,5 @@ __all__ = [
     "RetrievalDocument",
     "build_search_documents",
     "chunk_repository_file",
+    "search_repository",
 ]

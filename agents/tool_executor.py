@@ -3,10 +3,11 @@ from uuid import uuid4
 
 from core.mcp_client import call_github_tool_sync
 from core.observability import record_event
+from core.retrieval.search import search_repository
 from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolPermissionError
 from core.state.models import EngineeringState
 
-READ_ONLY_TOOLS = {"search_code", "list_repository", "read_file"}
+READ_ONLY_TOOLS = {"search_code", "list_repository", "read_file", "search_repository_rag"}
 
 
 def _tool_audit(
@@ -71,11 +72,35 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
         args.setdefault("ref", ref)
 
     try:
-        result = call_github_tool_sync(tool, args, agent=agent)
+        if tool == "search_repository_rag":
+            rag_results = search_repository(
+                str(args.get("query", state["task"])),
+                repository=repository,
+                ref=ref,
+                top_k=int(args.get("top_k", 5)),
+            )
+            result = json.dumps({"matches": rag_results})
+            call_name = "repository.rag"
+        else:
+            result = call_github_tool_sync(tool, args, agent=agent)
+            call_name = f"github.{tool}"
     except ToolPermissionError as exc:
         return _blocked_tool_state(state, agent, tool, exc)
-    evidence.append({"source": f"github://{repository}/{tool}", "detail": result})
-    calls.append({"tool": f"github.{tool}", "arguments": args})
+    except (ValueError, RuntimeError) as exc:
+        evidence.append({
+            "source": f"repository-rag://{repository}/{ref}",
+            "detail": json.dumps({"error": str(exc)}),
+        })
+        calls.append({
+            "tool": "repository.rag",
+            "arguments": {"repository": repository, "ref": ref, "query": args.get("query", state["task"])},
+            "status": "failed",
+        })
+        audited = _tool_audit(state, agent, tool, True, decision.risk, "failed")
+        return {**audited, "evidence": evidence, "tool_calls": calls, "status": "evidence_ready"}
+
+    evidence.append({"source": f"{call_name}://{repository}/{tool}", "detail": result})
+    calls.append({"tool": call_name, "arguments": args})
     audited = _tool_audit(state, agent, tool, True, decision.risk, "success")
 
     return {**audited, "evidence": evidence, "tool_calls": calls, "status": "evidence_ready"}

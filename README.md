@@ -130,7 +130,7 @@ flowchart TD
 - [x] Embedding + indexing adapter foundation
 - [ ] Working memory
 - [ ] Long-term engineering knowledge
-- [ ] Repository-aware RAG
+- [x] Repository-aware RAG
 
 ### Phase 4 — Production engineering
 - [x] Evaluation framework
