@@ -131,7 +131,6 @@ async def get_verification(task_id: str) -> dict:
     return _serialize_result(task_id, verified)
 
 
-@app.get("/v1/tasks/{task_id}/evaluation")
 @app.post("/v1/tasks/{task_id}/jobs")
 async def enqueue_task(task_id: str) -> dict:
     if task_store.get(task_id) is None:
