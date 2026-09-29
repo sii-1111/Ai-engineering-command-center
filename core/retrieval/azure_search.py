@@ -1,9 +1,4 @@
-"""Azure AI Search adapter for repository retrieval.
-
-The adapter keeps Azure-specific SDK code behind the repository retrieval
-contract. It supports hybrid keyword + vector search when a vector query is
-provided, while remaining usable with keyword search alone.
-"""
+"""Azure AI Search adapter for repository retrieval."""
 
 import os
 from collections.abc import Sequence
@@ -33,7 +28,7 @@ class AzureSearchConfig:
 
 
 class AzureRepositoryRetriever:
-    """Retrieve repository chunks from an Azure AI Search index."""
+    """Retrieve repository chunks from Azure AI Search with keyword/vector search."""
 
     def __init__(self, config: AzureSearchConfig) -> None:
         self.client = SearchClient(
@@ -47,6 +42,8 @@ class AzureRepositoryRetriever:
         query: str,
         *,
         embedding: Sequence[float] | None = None,
+        repository: str | None = None,
+        ref: str | None = None,
         top_k: int = 5,
     ) -> list[RetrievalDocument]:
         if top_k <= 0 or not query.strip():
@@ -62,11 +59,18 @@ class AzureRepositoryRetriever:
                 )
             ]
 
+        filters = []
+        if repository:
+            filters.append(f"repository eq '{repository.replace(chr(39), chr(39) * 2)}'")
+        if ref:
+            filters.append(f"ref eq '{ref.replace(chr(39), chr(39) * 2)}'")
+
         results = self.client.search(
             search_text=query,
             vector_queries=vector_queries,
+            filter=" and ".join(filters) if filters else None,
             top=top_k,
-            select=["source", "content"],
+            select=["source", "content", "repository", "ref", "commit_sha", "chunk_index"],
         )
         return [
             RetrievalDocument(
