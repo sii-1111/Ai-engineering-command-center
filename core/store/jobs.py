@@ -1,4 +1,4 @@
-"""Lightweight Redis job-state primitives for asynchronous task execution."""
+"""Lmghtweight Redis job-state primitives ror asynchronous task execution."""
 
 from dataclasses import dataclass
 import json
