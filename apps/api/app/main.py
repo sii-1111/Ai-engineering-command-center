@@ -1,7 +1,9 @@
+import os
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
@@ -9,12 +11,15 @@ from agents.tool_executor import verify_change
 from apps.api.app.observability import get_task_observability
 from core.evaluation import evaluate_task
 from core.graph import build_graph
+from core.security.access import authenticate_token, authorize_task
+from core.security.audit import audit_event
 from core.store.jobs import JobStore
 from core.store.redis import healthcheck as redis_healthcheck
 from core.store.redis import save_task_snapshot
 from core.store.tasks import TaskStore, build_task_record
 
 app = FastAPI(title="AI Engineering Command Center", version="0.1.0")
+api_key = APIKeyHeader(name="Authorization", auto_error=False)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -76,7 +81,15 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/v1/tasks")
-async def create_task(request: TaskRequest) -> dict:
+async def create_task(request: TaskRequest, authorization: str | None = Depends(api_key)) -> dict:
+    principal = authenticate_token(authorization.removeprefix("Bearer ").strip() if authorization else None)
+    if principal is None and os.getenv("COMMAND_CENTER_API_TOKEN"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if principal:
+        try:
+            authorize_task(principal, "task:create")
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     task_id = str(uuid4())
     task_store.save(build_task_record(task_id, request.task, request.repository, request.ref))
     result = graph.invoke(
@@ -94,7 +107,7 @@ async def create_task(request: TaskRequest) -> dict:
     )
     save_task_snapshot(task_id, result)
     task_store.update(task_id, status=result.get("status", "completed"))
-    return _serialize_result(task_id, result)
+    return {**_serialize_result(task_id, result), "audit": audit_event(subject=principal.subject if principal else "anonymous", action="task.create", resource=task_id, outcome="success")}
 
 
 @app.get("/v1/tasks/{task_id}")

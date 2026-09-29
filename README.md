@@ -139,6 +139,7 @@ flowchart TD
 - [x] Durable task metadata and Redis job state
 - [x] Dockerized services
 - [x] CI/CD validation
+- [ ] Enterprise authentication and RBAC
 - [ ] Azure deployment
 
 ## Project status
