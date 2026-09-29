@@ -11,6 +11,7 @@ TOOL_DESCRIPTIONS = """Available read-only GitHub tools:
 - search_code: find relevant code. Arguments: {repository, query}.
 - read_file: inspect a source file. Arguments: {repository, path, ref}.
 - list_repository: explore a repository directory. Arguments: {repository, path, ref}.
+- search_repository_rag: retrieve repository code chunks using Azure AI Search hybrid retrieval. Arguments: {repository, query, ref, top_k}.
 """
 
 PLANNER_SYSTEM = f"""You are an AI software engineering investigator.
