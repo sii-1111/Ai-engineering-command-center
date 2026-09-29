@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 import pytest
 
@@ -48,12 +48,12 @@ class FakeGraph:
         return self.result
 
 
+@dataclass
 class Job:
-    def __init__(self, job_id="job-1", task_id="task-1", status="queued", error=""):
-        self.job_id = job_id
-        self.task_id = task_id
-        self.status = status
-        self.error = error
+    job_id: str = "job-1"
+    task_id: str = "task-1"
+    status: str = "queued"
+    error: str = ""
 
 
 class Task:
