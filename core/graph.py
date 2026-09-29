@@ -9,7 +9,8 @@ from agents.llm_planner import build_dynamic_plan, decide_next_action, prepare_c
 from agents.reviewer import review_change
 from agents.tool_executor import execute_approved_change, execute_next_tool, verify_change
 from core.evaluation import evaluate_task
-from core.memory.working import WorkingMemory, memory_to_state\nfrom core.memory.promotion import promote_knowledge
+from core.memory.working import WorkingMemory, memory_to_state
+from core.memory.promotion import promote_knowledge
 from core.state.models import EngineeringState
 
 _CHECKPOINTER_CONTEXT = None
@@ -53,7 +54,7 @@ def produce_report(state: EngineeringState) -> EngineeringState:
     return {
         **state,
         "final_report": (
-            f"Root Cause: {report.get('root_cause', 'Not established')}\\n"
+            f"Root Cause: {report.get('root_cause', 'Not established')}\"
             f"Evidence: {report.get('evidence', [])}\\n"
             f"Impact: {report.get('impact', 'Not established')}\\n"
             f"Recommended Change: {report.get('recommended_change', 'None')}\\n"
