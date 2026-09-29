@@ -57,7 +57,7 @@ def run_worker(*, job_store: Any | None = None, task_store: Any | None = None, g
         _, job_id = item
         try:
             process_job(job_id, job_store=jobs, task_store=tasks, graph=runtime, max_attempts=max_attempts)
-        except Exception:
+        except (RuntimeError, ValueError):
             continue
 
 
