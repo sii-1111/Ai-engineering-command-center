@@ -135,7 +135,7 @@ flowchart TD
 ### Phase 4 — Production engineering
 - [x] Evaluation framework
 - [x] Task observability events
-- [ ] Cost/latency dashboards
+- [x] Cost/latency metrics API
 - [x] Durable task metadata and Redis job state
 - [x] Dockerized services
 - [x] CI/CD validation
