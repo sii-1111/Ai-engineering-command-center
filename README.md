@@ -128,7 +128,7 @@ flowchart TD
 - [x] Azure AI Search hybrid retrieval
 - [x] Deterministic repository chunking foundation
 - [x] Embedding + indexing adapter foundation
-- [ ] Working memory
+- [x] Working memory
 - [ ] Long-term engineering knowledge
 - [x] Repository-aware RAG
 
