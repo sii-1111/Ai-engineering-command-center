@@ -54,7 +54,7 @@ class PostgresKnowledgeStore(KnowledgeStore):
 
     def search(self, query: str, repository: str | None = None, top_k: int = 5) -> list[EngineeringKnowledge]:
         clauses = [
-            "to_tsvector('simple', root_cause || ' ' || fix || ' ' || "
+            ("to_tsvector('simple', root_cause || ' ' || fix || ' ' || "
             "coalesce(array_to_string(ARRAY(SELECT jsonb_array_elements_text(tags)), ' '), '')) "
             "@@ plainto_tsquery('simple', %s)"
         ]
