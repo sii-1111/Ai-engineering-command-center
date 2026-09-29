@@ -9,6 +9,7 @@ from agents.llm_planner import build_dynamic_plan, decide_next_action, prepare_c
 from agents.reviewer import review_change
 from agents.tool_executor import execute_approved_change, execute_next_tool, verify_change
 from core.evaluation import evaluate_task
+from core.memory.promotion import promote_knowledge
 from core.memory.working import WorkingMemory, memory_to_state
 from core.state.models import EngineeringState
 
@@ -53,7 +54,7 @@ def produce_report(state: EngineeringState) -> EngineeringState:
     return {
         **state,
         "final_report": (
-            f"Root Cause: {report.get('root_cause', 'Not established')}\\n"
+            f"Root Cause: {report.get('root_cause', 'Not established')}\n"
             f"Evidence: {report.get('evidence', [])}\\n"
             f"Impact: {report.get('impact', 'Not established')}\\n"
             f"Recommended Change: {report.get('recommended_change', 'None')}\\n"
@@ -105,6 +106,7 @@ def build_graph():
     graph.add_node("verify_change", verify_change)
     graph.add_node("review_change", review_change)
     graph.add_node("evaluate_task", evaluate_task)
+    graph.add_node("promote_knowledge", promote_knowledge)
     graph.add_edge(START, "planner")
     graph.add_edge("planner", "planner_memory")
     graph.add_edge("planner_memory", "execute_tool")
@@ -117,5 +119,6 @@ def build_graph():
     graph.add_edge("execute_change", "verify_change")
     graph.add_edge("verify_change", "review_change")
     graph.add_edge("review_change", "evaluate_task")
-    graph.add_edge("evaluate_task", END)
+    graph.add_edge("evaluate_task", "promote_knowledge")
+    graph.add_edge("promote_knowledge", END)
     return graph.compile(checkpointer=_CHECKPOINTER)

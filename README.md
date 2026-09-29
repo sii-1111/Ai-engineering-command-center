@@ -129,7 +129,7 @@ flowchart TD
 - [x] Deterministic repository chunking foundation
 - [x] Embedding + indexing adapter foundation
 - [x] Working memory
-- [ ] Long-term engineering knowledge
+- [x] Long-term engineering knowledge
 - [x] Repository-aware RAG
 
 ### Phase 4 — Production engineering

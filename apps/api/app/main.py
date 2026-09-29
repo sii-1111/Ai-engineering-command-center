@@ -59,6 +59,8 @@ def _serialize_result(task_id: str, result: dict) -> dict:
         "review": result.get("review", {}),
         "evaluation": result.get("evaluation", {}),
         "observability_events": result.get("observability_events", []),
+        "knowledge_promoted": result.get("knowledge_promoted", False),
+        "knowledge_id": result.get("knowledge_id", ""),
     }
 
 

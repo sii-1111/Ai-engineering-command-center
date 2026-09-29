@@ -3,11 +3,12 @@ from uuid import uuid4
 
 from core.mcp_client import call_github_tool_sync
 from core.observability import record_event
+from core.retrieval.knowledge import search_engineering_knowledge
 from core.retrieval.search import search_repository
 from core.security.tool_policy import DEFAULT_TOOL_POLICY, ToolPermissionError
 from core.state.models import EngineeringState
 
-READ_ONLY_TOOLS = {"search_code", "list_repository", "read_file", "search_repository_rag"}
+READ_ONLY_TOOLS = {"search_code", "list_repository", "read_file", "search_repository_rag", "search_engineering_knowledge"}
 
 
 def _tool_audit(
@@ -72,7 +73,15 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
         args.setdefault("ref", ref)
 
     try:
-        if tool == "search_repository_rag":
+        if tool == "search_engineering_knowledge":
+            knowledge = search_engineering_knowledge(
+                str(args.get("query", state["task"])),
+                repository=repository,
+                top_k=int(args.get("top_k", 5)),
+            )
+            result = json.dumps({"knowledge": knowledge})
+            call_name = "knowledge.search"
+        elif tool == "search_repository_rag":
             rag_results = search_repository(
                 str(args.get("query", state["task"])),
                 repository=repository,

@@ -11,12 +11,12 @@ TOOL_DESCRIPTIONS = """Available read-only GitHub tools:
 - search_code: find relevant code. Arguments: {repository, query}.
 - read_file: inspect a source file. Arguments: {repository, path, ref}.
 - list_repository: explore a repository directory. Arguments: {repository, path, ref}.
-- search_repository_rag: retrieve repository code chunks using Azure AI Search hybrid retrieval. Arguments: {repository, query, ref, top_k}.
+- search_repository_rag: retrieve repository code chunks using Azure AI Search hybrid retrieval. Arguments: {repository, query, ref, top_k}.\n- search_engineering_knowledge: retrieve prior verified engineering findings. Arguments: {repository, query, top_k}.
 """
 
 PLANNER_SYSTEM = f"""You are an AI software engineering investigator.
 Choose the FIRST minimal read-only investigation action for the task.
-Return JSON only: {{"tool":"search_code|list_repository|read_file","arguments":{{...}}}}.
+Return JSON only: {{"tool":"search_code|list_repository|read_file|search_repository_rag|search_engineering_knowledge","arguments":{{...}}}}.
 Never modify files. Prefer search_code for an unknown implementation.
 {TOOL_DESCRIPTIONS}"""
 
@@ -24,7 +24,7 @@ DECISION_SYSTEM = f"""You are an AI software engineering investigator working it
 Review the task and accumulated evidence, then choose exactly ONE next read-only GitHub action,
 or finish if the evidence is sufficient.
 Return JSON only in one of these forms:
-{{"action":"tool","tool":"search_code|list_repository|read_file","arguments":{{...}}}}
+{{"action":"tool","tool":"search_code|list_repository|read_file|search_repository_rag|search_engineering_knowledge","arguments":{{...}}}}
 or
 {{"action":"finish","report":{{"root_cause":"...","evidence":["exact evidence details"],"impact":"...","recommended_change":"...","files_involved":["path"],"confidence":0.0,"approval_required":false}}}}
 Rules for a finished report:
