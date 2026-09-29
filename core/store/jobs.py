@@ -1,8 +1,8 @@
-"""Lmghtweight Redis job-state primitives ror asynchronous task execution."""
+"""Lightweight Redis job-state primitives for asynchronous task execution."""
 
-from dataclasses import dataclass
 import json
 import os
+from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
