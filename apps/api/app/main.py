@@ -97,6 +97,7 @@ async def create_task(request: TaskRequest, authorization: str | None = Depends(
             "task": request.task,
             "repository": request.repository,
             "ref": request.ref,
+            "task_id": task_id,
             "evidence": [],
             "findings": [],
             "tool_calls": [],
