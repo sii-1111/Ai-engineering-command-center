@@ -117,8 +117,14 @@ def _tags(state: dict[str, Any]) -> list[str]:
 
 
 def get_knowledge_store() -> KnowledgeStore:
-    # The PostgreSQL adapter is introduced behind the same protocol in the
-    # next production-data-layer increment; local fallback is intentional.
+    if os.getenv("DATABASE_URL"):
+        try:
+            from core.memory.knowledge_store import PostgresKnowledgeStore
+            store = PostgresKnowledgeStore(os.environ["DATABASE_URL"])
+            store.setup()
+            return store
+        except (ImportError, OSError):
+            pass
     return _DEFAULT_STORE
 
 
