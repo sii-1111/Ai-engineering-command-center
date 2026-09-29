@@ -1,8 +1,15 @@
 from collections.abc import Iterable
+
 from .models import EvaluationResult
 
-def assert_quality_gate(results: Iterable[EvaluationResult], *, min_overall: float = 0.80,
-                        max_latency_ms: float = 5000.0, max_cost_usd: float = 0.25) -> None:
+
+def assert_quality_gate(
+    results: Iterable[EvaluationResult],
+    *,
+    min_overall: float = 0.80,
+    max_latency_ms: float = 5000.0,
+    max_cost_usd: float = 0.25,
+) -> None:
     failures = []
     for result in results:
         if result.overall < min_overall:
