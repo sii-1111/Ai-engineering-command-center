@@ -136,7 +136,8 @@ flowchart TD
 - [x] Evaluation framework
 - [x] Task observability events
 - [ ] Cost/latency dashboards
-- [ ] Dockerized services
+- [x] Durable task metadata and Redis job state
+- [x] Dockerized services
 - [x] CI/CD validation
 - [ ] Azure deployment
 
