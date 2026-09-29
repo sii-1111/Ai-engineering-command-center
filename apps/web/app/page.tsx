@@ -22,37 +22,38 @@ const stageNames = ["Planner", "Repository investigation", "Root-cause analysis"
 
 function stagesFor(data?: TaskResult): Stage[] {
   if (!data) return stageNames.map(name => ({ name, state: "idle" }));
-  const status = data.status;
-  const approval = data.approval_status;
   const review = data.review || {};
-  const verification = data.verification_status;
   const states: Stage[] = stageNames.map(name => ({ name, state: "idle" }));
   states[0].state = "done";
   states[1].state = "done";
   states[2].state = data.report ? "done" : "active";
-  if (status === "awaiting_approval") {
-    states[3].state = "active";
-  } else if (approval && approval !== "not_required") {
-    states[3].state = "done";
-  }
+  if (data.status === "awaiting_approval") states[3].state = "active";
+  else if (data.approval_status && data.approval_status !== "not_required") states[3].state = "done";
   if (data.pull_request && Object.keys(data.pull_request).length) states[4].state = "done";
-  else if (approval === "approved") states[4].state = "active";
-  if (verification === "passed" || verification === "failed") states[5].state = "done";
+  else if (data.approval_status === "approved") states[4].state = "active";
+  if (data.verification_status === "passed" || data.verification_status === "failed") states[5].state = "done";
   else if (data.pull_request && Object.keys(data.pull_request).length) states[5].state = "active";
   if (Object.keys(review).length) states[6].state = "done";
-  else if (verification === "passed" || verification === "failed") states[6].state = "active";
+  else if (data.verification_status === "passed" || data.verification_status === "failed") states[6].state = "active";
   return states;
 }
 
 function metricValue(data: TaskResult | undefined, key: string): string {
   const evaluation = data?.evaluation || {};
-  const candidates: Record<string, unknown> = {
+  const values: Record<string, unknown> = {
     Evidence: evaluation.evidence_count ?? data?.report?.evidence_count,
     "Tool calls": evaluation.tool_call_count,
     Confidence: evaluation.confidence != null ? `${Math.round(Number(evaluation.confidence) * 100)}%` : undefined,
     Latency: evaluation.latency_seconds != null ? `${Number(evaluation.latency_seconds).toFixed(1)}s` : undefined,
   };
-  return candidates[key] == null ? "—" : String(candidates[key]);
+  return values[key] == null ? "—" : String(values[key]);
+}
+
+function statusTone(status?: string) {
+  if (status === "completed" || status === "passed") return "good";
+  if (status === "awaiting_approval" || status === "running") return "warn";
+  if (status === "failed" || status === "rejected") return "danger";
+  return "neutral";
 }
 
 export default function Home() {
@@ -65,6 +66,12 @@ export default function Home() {
 
   const stages = useMemo(() => stagesFor(data), [data]);
   const metrics = ["Evidence", "Tool calls", "Confidence", "Latency"];
+  const evidence = Array.isArray(data?.report?.evidence) ? data.report.evidence as unknown[] : [];
+  const events = data?.observability_events ?? [];
+  const waitingApproval = data?.status === "awaiting_approval";
+  const quality = data?.evaluation?.overall_score ?? data?.evaluation?.overall ?? "—";
+  const verification = data?.verification_status ?? "not started";
+  const reportText = data?.final_report || (data?.report ? JSON.stringify(data.report, null, 2) : "Run an investigation to populate live engineering evidence.");
 
   useEffect(() => {
     if (!data?.task_id || data.status === "completed") return;
@@ -72,9 +79,7 @@ export default function Home() {
       try {
         const res = await fetch(`${api}/v1/tasks/${data.task_id}`);
         if (res.ok) setData(await res.json());
-      } catch {
-        // Keep the last known state when the API is temporarily unavailable.
-      }
+      } catch { /* Preserve the last known task state during transient API failures. */ }
     }, 2000);
     return () => window.clearInterval(timer);
   }, [api, data?.task_id, data?.status]);
@@ -83,7 +88,8 @@ export default function Home() {
     setRunning(true); setError(""); setData(undefined);
     try {
       const res = await fetch(`${api}/v1/tasks`, {
-        method: "POST", headers: {"Content-Type":"application/json"},
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
         body: JSON.stringify({task, repository: repo, ref:"main"})
       });
       if (!res.ok) throw new Error(`Task API returned ${res.status}`);
@@ -98,7 +104,8 @@ export default function Home() {
     setRunning(true); setError("");
     try {
       const res = await fetch(`${api}/v1/tasks/${data.task_id}/approval`, {
-        method: "POST", headers: {"Content-Type":"application/json"},
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
         body: JSON.stringify({approved: value})
       });
       if (!res.ok) throw new Error(`Approval API returned ${res.status}`);
@@ -108,32 +115,81 @@ export default function Home() {
     } finally { setRunning(false); }
   }
 
-  const evidence = Array.isArray(data?.report?.evidence) ? data?.report?.evidence as unknown[] : [];
-  const reportText = data?.final_report || (data?.report ? JSON.stringify(data.report, null, 2) : "Run an investigation to populate live engineering evidence.");
-  const waitingApproval = data?.status === "awaiting_approval";
-
   return <div className="shell">
     <aside className="sidebar">
-      <div className="brand"><div className="logo">✦</div>AI Engineering Command Center</div>
-      <div className="nav"><div className="active">Command Center</div><div>Investigations</div><div>Evidence</div><div>Evaluations</div><div>Settings</div></div>
-      <div className="sidefoot">Agentic engineering workspace<br/>LangGraph · MCP · GitHub · Azure OpenAI</div>
+      <div className="brand"><div className="logo">✦</div><span>AI Command Center</span></div>
+      <div className="workspace"><span className="workspace-dot"/>Engineering workspace</div>
+      <nav className="nav">
+        <div className="active"><span>⌁</span> Command Center</div>
+        <div><span>◌</span> Investigations</div>
+        <div><span>◇</span> Evidence</div>
+        <div><span>◫</span> Evaluations</div>
+        <div><span>⚙</span> Settings</div>
+      </nav>
+      <div className="sidefoot"><span>ONLINE</span><br/>LangGraph · MCP · GitHub<br/>Azure OpenAI · Azure AI Search</div>
     </aside>
+
     <main>
-      <header className="top"><div><div className="eyebrow">Production engineering workspace</div><h1 className="title">Turn engineering questions into verified changes.</h1><div className="sub">Plan → investigate → approve → change → verify → review.</div></div><div className="status">● {data?.status?.toUpperCase() ?? "SYSTEM READY"}</div></header>
+      <header className="top">
+        <div>
+          <div className="eyebrow">AI ENGINEERING / COMMAND CENTER</div>
+          <h1 className="title">From engineering question to verified outcome.</h1>
+          <div className="sub">Investigate with evidence. Mutate only with approval. Verify every change.</div>
+        </div>
+        <div className={`status ${statusTone(data?.status)}`}><i/> {data?.status?.replaceAll("_", " ").toUpperCase() ?? "SYSTEM READY"}</div>
+      </header>
 
-      <section className="grid">
-        <div className="panel"><h2>New engineering task</h2><textarea className="taskbox" value={task} onChange={e=>setTask(e.target.value)} /><div className="controls"><input className="input" value={repo} onChange={e=>setRepo(e.target.value)} aria-label="Repository" /><button className="primary" onClick={runTask} disabled={running}>{running ? "Running…" : "Run investigation →"}</button></div>{error && <div className="error">{error}</div>}</div>
-        <div className="panel"><h2>Execution pipeline</h2><div className="steps">{stages.map(s=><div className={`step ${s.state}`} key={s.name}><i className="dot"/><span>{s.name}</span><small>{s.state === "done" ? "DONE" : s.state === "active" ? "ACTIVE" : "WAITING"}</small></div>)}</div></div>
+      <section className="hero-grid">
+        <div className="panel task-panel">
+          <div className="panel-head"><div><span className="section-kicker">01 / COMMAND</span><h2>New engineering task</h2></div><span className="mono">POST /v1/tasks</span></div>
+          <textarea className="taskbox" value={task} onChange={e=>setTask(e.target.value)} />
+          <div className="controls"><input className="input" value={repo} onChange={e=>setRepo(e.target.value)} aria-label="Repository" /><button className="primary" onClick={runTask} disabled={running}>{running ? "Executing…" : "Run investigation →"}</button></div>
+          {error && <div className="error">{error}</div>}
+        </div>
+
+        <div className="panel pipeline-panel">
+          <div className="panel-head"><div><span className="section-kicker">02 / ORCHESTRATION</span><h2>Agent execution</h2></div><span className="live-dot">LIVE</span></div>
+          <div className="steps">{stages.map((s, i)=><div className={`step ${s.state}`} key={s.name}><span className="step-index">0{i+1}</span><i className="dot"/><span>{s.name}</span><small>{s.state === "done" ? "DONE" : s.state === "active" ? "ACTIVE" : "WAITING"}</small></div>)}</div>
+        </div>
       </section>
 
-      <section className="metrics">{metrics.map(label=><div className="metric" key={label}><span>{label}</span><b>{metricValue(data,label)}</b></div>)}</section>
+      <section className="metrics">{metrics.map(label=><div className="metric" key={label}><span>{label}</span><b>{metricValue(data,label)}</b><em>{label === "Confidence" ? "grounded signal" : label === "Latency" ? "end-to-end" : "current run"}</em></div>)}</section>
 
-      <section className="bottom">
-        <div className="panel"><h2>Evidence trail</h2><div className="evidence">
-          {evidence.length ? evidence.map((item, i)=><div className="row" key={i}><code>evidence {i+1}</code><br/>{typeof item === "string" ? item : JSON.stringify(item)}</div>) : <div className="row">No evidence returned yet. Start an investigation to populate this panel.</div>}
-        </div></div>
-        <div className="panel"><h2>Engineering outcome</h2><div className="review"><div><b>{waitingApproval ? "Approval required" : data?.status === "completed" ? "Investigation complete" : "Awaiting execution"}</b><div className="sub">{waitingApproval ? "Review the proposed mutation before execution." : "Outcome is populated directly from the task state."}</div></div><span className={`pill ${waitingApproval ? "warn" : "pass"}`}>{waitingApproval ? "HITL" : data?.status?.toUpperCase() ?? "READY"}</span></div><div style={{marginTop:12}}><div className="row"><code>Task ID</code><br/>{data?.task_id ?? "—"}</div><div className="row"><code>Final report</code><br/><pre>{reportText}</pre></div>{waitingApproval && <div className="controls"><button className="primary" onClick={()=>approval(true)} disabled={running}>Approve change</button><button className="secondary" onClick={()=>approval(false)} disabled={running}>Reject</button></div>}{Boolean(data?.pull_request && Object.keys(data.pull_request).length) && <div className="row"><code>Pull request</code><br/>{String(data?.pull_request?.url ?? "Created")}</div>}</div></div>
+      <section className="workspace-grid">
+        <div className="panel evidence-panel">
+          <div className="panel-head"><div><span className="section-kicker">03 / TRACEABILITY</span><h2>Evidence trail</h2></div><span className="count">{evidence.length || 0} items</span></div>
+          <div className="evidence">
+            {evidence.length ? evidence.map((item, i)=><div className="row" key={i}><div className="row-top"><code>EVIDENCE {String(i+1).padStart(2,"0")}</code><span>grounded</span></div><div>{typeof item === "string" ? item : JSON.stringify(item)}</div></div>) : <div className="empty"><span>◇</span><div><b>No evidence captured yet</b><p>Run an investigation to populate repository-grounded findings.</p></div></div>}
+          </div>
+        </div>
+
+        <div className="panel outcome-panel">
+          <div className="panel-head"><div><span className="section-kicker">04 / DECISION</span><h2>Engineering outcome</h2></div><span className={`pill ${waitingApproval ? "warn" : statusTone(data?.status)}`}>{waitingApproval ? "HUMAN REVIEW" : data?.status?.toUpperCase() ?? "READY"}</span></div>
+          <div className="outcome-summary"><div className="outcome-icon">{waitingApproval ? "!" : "✓"}</div><div><b>{waitingApproval ? "Approval required" : data?.status === "completed" ? "Investigation complete" : "Awaiting execution"}</b><p>{waitingApproval ? "Review the proposed mutation before execution." : "Outcome is populated directly from durable task state."}</p></div></div>
+          {waitingApproval && <div className="controls approval"><button className="primary" onClick={()=>approval(true)} disabled={running}>Approve change</button><button className="secondary" onClick={()=>approval(false)} disabled={running}>Reject</button></div>}
+          <div className="detail-list">
+            <div><span>Task ID</span><code>{data?.task_id ?? "—"}</code></div>
+            <div><span>Verification</span><strong className={statusTone(verification)}>{String(verification).toUpperCase()}</strong></div>
+            <div><span>Evaluation</span><strong>{String(quality)}</strong></div>
+            <div><span>Pull request</span><code>{data?.pull_request?.url ? String(data.pull_request.url) : "—"}</code></div>
+          </div>
+        </div>
       </section>
+
+      <section className="lower-grid">
+        <div className="panel report-panel">
+          <div className="panel-head"><div><span className="section-kicker">05 / REPORT</span><h2>Final engineering report</h2></div></div>
+          <pre className="report">{reportText}</pre>
+        </div>
+        <div className="panel events-panel">
+          <div className="panel-head"><div><span className="section-kicker">06 / OBSERVABILITY</span><h2>Execution timeline</h2></div><span className="count">{events.length || 0} events</span></div>
+          <div className="timeline">
+            {events.length ? events.map((event, i)=><div className="event" key={i}><span className="event-line"/><div><b>{String(event.event_type ?? event.type ?? "agent event")}</b><p>{String(event.message ?? event.detail ?? "Task state recorded")}</p></div><code>{String(event.timestamp ?? event.created_at ?? "—")}</code></div>) : <div className="empty"><span>◷</span><div><b>Timeline is waiting</b><p>Agent, tool and verification events appear here as the task runs.</p></div></div>}
+          </div>
+        </div>
+      </section>
+
+      <footer><span>AI ENGINEERING COMMAND CENTER</span><span>Evidence-first · Human-approved · Observable</span><span>v0.1 / production-style reference</span></footer>
     </main>
   </div>;
 }
