@@ -6,6 +6,7 @@ from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from agents.tool_executor import verify_change
+from apps.api.app.observability import get_task_observability
 from core.evaluation import evaluate_task
 from core.graph import build_graph
 from core.store.jobs import JobStore
@@ -158,3 +159,11 @@ async def get_evaluation(task_id: str) -> dict:
     evaluated = evaluate_task(state.values)
     graph.update_state(config, evaluated)
     return _serialize_result(task_id, evaluated)
+
+
+@app.get("/v1/tasks/{task_id}/observability")
+async def get_observability(task_id: str) -> dict:
+    state = graph.get_state(_config(task_id))
+    if not state.values:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return get_task_observability(task_id, state.values)
