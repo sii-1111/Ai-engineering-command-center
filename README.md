@@ -142,6 +142,7 @@ flowchart TD
 - [x] CI/CD validation
 - [ ] Enterprise authentication and RBAC
 - [x] Production async task worker
+- [x] Bounded retries and exponential backoff
 - [ ] Azure deployment
 
 ## Project status

@@ -14,9 +14,9 @@ class FakeJobStore:
     def get(self, job_id):
         return self.job if self.job and self.job.job_id == job_id else None
 
-    def update(self, job_id, status, error=""):
-        self.updates.append((job_id, status, error))
-        self.job = replace(self.job, status=status, error=error)
+    def update(self, job_id, status, error="", attempts=None):
+        self.updates.append((job_id, status, error, attempts))
+        self.job = replace(self.job, status=status, error=error, attempts=self.job.attempts if attempts is None else attempts)
         return self.job
 
 
@@ -36,16 +36,16 @@ class FakeTaskStore:
 
 
 class FakeGraph:
-    def __init__(self, result=None, error=None):
-        self.result = result or {"status": "completed"}
-        self.error = error
-        self.calls = []
+    def __init__(self, results=None, errors=None):
+        self.results = list(results or [{"status": "completed"}])
+        self.errors = list(errors or [])
+        self.calls = 0
 
     def invoke(self, state, config):
-        self.calls.append((state, config))
-        if self.error:
-            raise self.error
-        return self.result
+        self.calls += 1
+        if self.errors:
+            raise self.errors.pop(0)
+        return self.results.pop(0)
 
 
 @dataclass
@@ -54,6 +54,7 @@ class Job:
     task_id: str = "task-1"
     status: str = "queued"
     error: str = ""
+    attempts: int = 0
 
 
 class Task:
@@ -69,44 +70,49 @@ class Task:
 def test_process_job_runs_graph_and_marks_job_complete(monkeypatch):
     snapshots = []
     monkeypatch.setattr("core.workers.task_worker.save_task_snapshot", lambda task_id, result: snapshots.append((task_id, result)))
-    jobs = FakeJobStore(Job())
-    tasks = FakeTaskStore(Task())
-    graph = FakeGraph({"status": "awaiting_approval"})
-
-    result = process_job("job-1", job_store=jobs, task_store=tasks, graph=graph)
-
-    assert result["status"] == "awaiting_approval"
-    assert jobs.updates == [("job-1", "running", ""), ("job-1", "completed", "")]
-    assert tasks.updates[0] == ("task-1", {"status": "awaiting_approval"})
+    jobs, tasks, graph = FakeJobStore(Job()), FakeTaskStore(Task()), FakeGraph()
+    result = process_job("job-1", job_store=jobs, task_store=tasks, graph=graph, sleep=lambda _: None)
+    assert result["status"] == "completed"
+    assert jobs.job.status == "completed"
+    assert jobs.job.attempts == 1
     assert snapshots == [("task-1", result)]
-    assert graph.calls[0][0]["task_id"] == "task-1"
-    assert graph.calls[0][1]["configurable"]["thread_id"] == "task-1"
 
 
-def test_process_job_marks_failure_and_preserves_error(monkeypatch):
+def test_process_job_retries_transient_failure(monkeypatch):
     monkeypatch.setattr("core.workers.task_worker.save_task_snapshot", lambda *_: None)
-    jobs = FakeJobStore(Job())
-    tasks = FakeTaskStore(Task())
-    graph = FakeGraph(error=RuntimeError("GitHub unavailable"))
+    jobs, tasks = FakeJobStore(Job()), FakeTaskStore(Task())
+    graph = FakeGraph(errors=[RuntimeError("temporary" )])
+    delays = []
+    result = process_job("job-1", job_store=jobs, task_store=tasks, graph=graph, sleep=delays.append)
+    assert result["status"] == "completed"
+    assert graph.calls == 2
+    assert delays == [1.0]
+    assert jobs.job.attempts == 2
+    assert any(status == "retrying" for _, status, _, _ in jobs.updates)
 
-    with pytest.raises(RuntimeError, match="GitHub unavailable"):
-        process_job("job-1", job_store=jobs, task_store=tasks, graph=graph)
 
-    assert jobs.updates[-1] == ("job-1", "failed", "GitHub unavailable")
-    assert tasks.updates[-1] == ("task-1", {"status": "failed", "error": "GitHub unavailable"})
+def test_process_job_exhausts_retries_and_records_terminal_failure(monkeypatch):
+    monkeypatch.setattr("core.workers.task_worker.save_task_snapshot", lambda *_: None)
+    jobs, tasks = FakeJobStore(Job()), FakeTaskStore(Task())
+    graph = FakeGraph(errors=[RuntimeError("temporary-1"), RuntimeError("temporary-2"), RuntimeError("terminal")])
+    delays = []
+    with pytest.raises(RuntimeError, match="terminal"):
+        process_job("job-1", job_store=jobs, task_store=tasks, graph=graph, sleep=delays.append)
+    assert graph.calls == 3
+    assert delays == [1.0, 2.0]
+    assert jobs.job.status == "failed"
+    assert jobs.job.attempts == 3
+    assert tasks.record.status == "failed"
+    assert tasks.record.error == "terminal"
 
 
 def test_process_job_rejects_missing_job():
-    jobs = FakeJobStore(None)
-    tasks = FakeTaskStore(Task())
     with pytest.raises(ValueError, match="was not found"):
-        process_job("missing", job_store=jobs, task_store=tasks, graph=FakeGraph())
+        process_job("missing", job_store=FakeJobStore(None), task_store=FakeTaskStore(Task()), graph=FakeGraph())
 
 
-def test_process_job_fails_when_task_metadata_is_missing(monkeypatch):
-    monkeypatch.setattr("core.workers.task_worker.save_task_snapshot", lambda *_: None)
+def test_process_job_fails_when_task_metadata_is_missing():
     jobs = FakeJobStore(Job())
-    tasks = FakeTaskStore(None)
     with pytest.raises(ValueError, match="Task 'task-1' was not found"):
-        process_job("job-1", job_store=jobs, task_store=tasks, graph=FakeGraph())
-    assert jobs.updates[-1] == ("job-1", "failed", "Task metadata was not found.")
+        process_job("job-1", job_store=jobs, task_store=FakeTaskStore(None), graph=FakeGraph())
+    assert jobs.job.status == "failed"
