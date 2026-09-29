@@ -73,7 +73,15 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
         args.setdefault("ref", ref)
 
     try:
-        if tool == "search_engineering_knowledge":\n            knowledge = search_engineering_knowledge(\n                str(args.get("query", state["task"])), repository=repository, top_k=int(args.get("top_k", 5))\n            )\n            result = json.dumps({"knowledge": knowledge})\n            call_name = "knowledge.search"\n        elif tool == "search_repository_rag":
+        if tool == "search_engineering_knowledge":
+            knowledge = search_engineering_knowledge(
+                str(args.get("query", state["task"])),
+                repository=repository,
+                top_k=int(args.get("top_k", 5)),
+            )
+            result = json.dumps({"knowledge": knowledge})
+            call_name = "knowledge.search"
+        elif tool == "search_repository_rag":
             rag_results = search_repository(
                 str(args.get("query", state["task"])),
                 repository=repository,
