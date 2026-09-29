@@ -5,9 +5,9 @@ portable record. PostgreSQL is used when configured; an in-memory backend keeps
 local development and tests deterministic.
 """
 
+import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-import os
 from threading import Lock
 from typing import Any, Protocol
 
