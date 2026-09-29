@@ -53,3 +53,5 @@ class EngineeringState(TypedDict, total=False):
     review: ReviewResult
     observability_events: list[dict]
     evaluation: dict
+    memory_summary: str
+    memory_decisions: list[dict]
