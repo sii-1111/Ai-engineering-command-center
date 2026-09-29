@@ -29,6 +29,7 @@ class PostgresKnowledgeStore(KnowledgeStore):
 
     def _connect(self):
         import psycopg
+
         return psycopg.connect(self.database_url)
 
     def setup(self) -> None:
@@ -44,19 +45,30 @@ class PostgresKnowledgeStore(KnowledgeStore):
                 VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (knowledge_id) DO NOTHING""",
                 (
-                    knowledge.knowledge_id, knowledge.task_id, knowledge.repository,
-                    knowledge.ref, knowledge.root_cause, knowledge.fix,
-                    json.dumps(list(knowledge.files)), knowledge.verification,
-                    knowledge.confidence, knowledge.pull_request,
-                    json.dumps(list(knowledge.tags)), knowledge.created_at,
+                    knowledge.knowledge_id,
+                    knowledge.task_id,
+                    knowledge.repository,
+                    knowledge.ref,
+                    knowledge.root_cause,
+                    knowledge.fix,
+                    json.dumps(list(knowledge.files)),
+                    knowledge.verification,
+                    knowledge.confidence,
+                    knowledge.pull_request,
+                    json.dumps(list(knowledge.tags)),
+                    knowledge.created_at,
                 ),
             )
 
-    def search(self, query: str, repository: str | None = None, top_k: int = 5) -> list[EngineeringKnowledge]:
+    def search(
+        self, query: str, repository: str | None = None, top_k: int = 5
+    ) -> list[EngineeringKnowledge]:
         clauses = [
-            ("to_tsvector('simple', root_cause || ' ' || fix || ' ' || "
-            "coalesce(array_to_string(ARRAY(SELECT jsonb_array_elements_text(tags)), ' '), '')) "
-            "@@ plainto_tsquery('simple', %s)"
+            (
+                "to_tsvector('simple', root_cause || ' ' || fix || ' ' || "
+                "coalesce(array_to_string(ARRAY(SELECT jsonb_array_elements_text(tags)), ' '), '')) "
+                "@@ plainto_tsquery('simple', %s)"
+            )
         ]
         params: list[Any] = [query]
         if repository:
@@ -76,8 +88,16 @@ class PostgresKnowledgeStore(KnowledgeStore):
 
 def _row_to_knowledge(row: tuple[Any, ...]) -> EngineeringKnowledge:
     return EngineeringKnowledge(
-        knowledge_id=row[0], task_id=row[1], repository=row[2], ref=row[3],
-        root_cause=row[4], fix=row[5], files=tuple(row[6] or []),
-        verification=row[7], confidence=float(row[8]), pull_request=row[9],
-        tags=tuple(row[10] or []), created_at=row[11].isoformat(),
+        knowledge_id=row[0],
+        task_id=row[1],
+        repository=row[2],
+        ref=row[3],
+        root_cause=row[4],
+        fix=row[5],
+        files=tuple(row[6] or []),
+        verification=row[7],
+        confidence=float(row[8]),
+        pull_request=row[9],
+        tags=tuple(row[10] or []),
+        created_at=row[11].isoformat(),
     )
