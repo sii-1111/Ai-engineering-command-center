@@ -1,8 +1,4 @@
-"""Local repository-aware retrieval service."""
-
-import json
-import os
-from pathlib import Path
+"""Local repository-aware retrieval query service."""
 
 from core.retrieval.local_search import LocalRepositoryRetriever, LocalSearchConfig
 
