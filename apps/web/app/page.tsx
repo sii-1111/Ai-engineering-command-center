@@ -237,7 +237,7 @@ export default function Home() {
               </div>
               <div>
                 <span className="label">Retrieval</span>
-                <strong>Azure AI Search</strong>
+                <strong>Local retrieval + Gemini embeddings</strong>
               </div>
               <div>
                 <span className="label">State</span>
