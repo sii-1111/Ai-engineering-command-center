@@ -53,6 +53,38 @@ Rules:
 - The change must directly address the recommended_change and be supported by evidence.
 """
 
+def _successful_tool_call_count(state: EngineeringState) -> int:
+    return sum(1 for call in state.get("tool_calls", []) if call.get("status") == "success")
+
+
+def _fallback_investigation_tool(state: EngineeringState) -> dict:
+    inspected_paths = {
+        str(call.get("arguments", {}).get("path"))
+        for call in state.get("tool_calls", [])
+        if call.get("tool") == "github.read_file"
+    }
+    candidates = ["core/graph.py", "agents/llm_planner.py", "apps/web/app/page.tsx", "pyproject.toml", "README.md"]
+
+    for item in state.get("evidence", []):
+        if item.get("source", "").endswith("/list_repository"):
+            try:
+                entries = json.loads(item.get("detail", ""))
+            except (TypeError, ValueError):
+                entries = []
+            if isinstance(entries, list):
+                candidates = [
+                    str(entry.get("path"))
+                    for entry in entries
+                    if entry.get("type") == "file" and entry.get("path")
+                ] + candidates
+                break
+
+    for path in candidates:
+        if path and path not in inspected_paths:
+            return {"tool": "read_file", "arguments": {"repository": state["repository"], "path": path, "ref": state.get("ref", "main")}}
+    return {"tool": "list_repository", "arguments": {"repository": state["repository"], "path": "", "ref": state.get("ref", "main")}}
+
+
 def _bounded_tool_calls(state: EngineeringState) -> bool:
     return len(state.get("tool_calls", [])) >= MAX_TOOL_CALLS or state.get("current_step", 0) >= MAX_ITERATIONS
 
@@ -134,7 +166,7 @@ def build_dynamic_plan(state: EngineeringState) -> EngineeringState:
 def decide_next_action(state: EngineeringState) -> EngineeringState:
     if _bounded_tool_calls(state):
         return {**state, "status": "investigation_complete", "report": _bounded_report(state)}
-    if len(state.get("tool_calls", [])) < 3:
+    if _successful_tool_call_count(state) < 3:
         context_note = "You MUST choose another read-only tool because fewer than 3 successful tool calls have been collected."
     else:
         context_note = "You may finish only when the evidence is sufficient; otherwise choose another tool."
@@ -153,6 +185,12 @@ def decide_next_action(state: EngineeringState) -> EngineeringState:
         {"role": "user", "content": context},
     ])
     if decision.get("action") == "finish":
+        if _successful_tool_call_count(state) < 3:
+            fallback = _fallback_investigation_tool(state)
+            return {**state,
+                    "dynamic_plan": [fallback],
+                    "current_step": state.get("current_step", 0) + 1,
+                    "status": "ready_to_execute"}
         return {**state, "status": "investigation_complete",
                 "report": _normalize_report(decision.get("report", {}), state.get("evidence", []))}
     return {**state,

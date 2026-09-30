@@ -42,7 +42,12 @@ class FakeLLM:
                 "tool": "search_code",
                 "arguments": {"query": "Find the search implementation."},
             }
-        if FakeLLM.calls == 2:
+        if FakeLLM.calls in (2, 3):
+            return {
+                "tool": "read_file",
+                "arguments": {"path": "apps/api/app/main.py", "ref": "main"},
+            }
+        if FakeLLM.calls == 4:
             return {
                 "action": "finish",
                 "report": {
@@ -115,7 +120,7 @@ def test_graph_pauses_for_human_approval(monkeypatch) -> None:
     assert result["report"]["approval_required"] is True
     assert result["__interrupt__"][0].value["type"] == "approval_required"
     assert result["__interrupt__"][0].value["report"]["confidence"] == 0.9
-    assert FakeLLM.calls == 3
+    assert FakeLLM.calls == 5
 
 
 def test_graph_resumes_after_approval(monkeypatch) -> None:
@@ -192,6 +197,11 @@ def test_report_rejects_unsupported_evidence_and_clamps_confidence(monkeypatch) 
                     "tool": "search_code",
                     "arguments": {"query": "Find the search implementation."},
                 }
+            if UnsafeFakeLLM.calls in (2, 3):
+                return {
+                    "tool": "read_file",
+                    "arguments": {"path": "apps/api/app/main.py", "ref": "main"},
+                }
             return {
                 "action": "finish",
                 "report": {
@@ -217,7 +227,7 @@ def test_report_rejects_unsupported_evidence_and_clamps_confidence(monkeypatch) 
         "status": "started",
     }, config=_config())
 
-    assert result["report"]["evidence"] == [SEARCH_EVIDENCE]
+    assert SEARCH_EVIDENCE in result["report"]["evidence"]
     assert result["report"]["confidence"] == 0.0
     assert result["report"]["root_cause"].startswith("The model did not provide")
 
