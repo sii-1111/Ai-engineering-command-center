@@ -49,9 +49,16 @@ async def call_github_tool(
                     parts.append(json.dumps(dumped["data"]))
                 else:
                     parts.append(json.dumps(dumped))
-        structured = getattr(result, "structuredContent", None)
+        structured = getattr(result, "structuredContent", None) or getattr(result, "structured_content", None)
         if structured:
             parts.append(json.dumps(structured))
+        if not parts:
+            try:
+                dumped = result.model_dump()
+            except AttributeError:
+                dumped = None
+            if dumped:
+                parts.append(json.dumps(dumped))
         return "\n".join(parts)
 
 
