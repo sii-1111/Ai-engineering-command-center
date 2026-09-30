@@ -60,11 +60,14 @@ def _bounded_tool_calls(state: EngineeringState) -> bool:
 def _normalize_report(raw: dict[str, Any], evidence: list[dict[str, str]]) -> EngineeringReport:
     evidence_by_id = {item.get("id", ""): item for item in evidence if item.get("id")}
     cited_items: list[dict[str, str]] = []
-    for reference in raw.get("evidence", []):
+    requested_evidence = raw.get("evidence", [])
+
+    for reference in requested_evidence:
         key = str(reference)
         if key in evidence_by_id:
             cited_items.append(evidence_by_id[key])
             continue
+        # Backward-compatible exact/substring matching for legacy model outputs.
         for item in evidence:
             detail = item.get("detail", "")
             if key == detail or (key and key in detail):
@@ -73,23 +76,23 @@ def _normalize_report(raw: dict[str, Any], evidence: list[dict[str, str]]) -> En
 
     cited = [item.get("detail", "") for item in cited_items if item.get("detail")]
     if not cited:
-        cited = [
+        collected = [
             item.get("detail", "")
             for item in evidence
             if item.get("detail")
             and not item.get("detail", "").startswith("Error executing tool")
             and '"error"' not in item.get("detail", "")
         ][:6]
-    if not cited:
         return {
-            "root_cause": "The repository investigation did not produce usable evidence.",
-            "evidence": [],
+            "root_cause": "The model did not provide a conclusion supported by cited evidence.",
+            "evidence": collected,
             "impact": "No reliable impact assessment was produced.",
-            "recommended_change": "Retry the investigation with a reachable repository and GitHub access.",
+            "recommended_change": "Review the collected evidence and retry with a focused task.",
             "files_involved": [],
             "confidence": 0.0,
             "approval_required": False,
         }
+
     try:
         confidence = float(raw.get("confidence", 0.0))
     except (TypeError, ValueError):
