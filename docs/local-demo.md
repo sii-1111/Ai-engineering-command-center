@@ -1,6 +1,7 @@
 # Local Command Center Demo
 
-This guide runs the real Next.js Command Center against the FastAPI backend.
+This guide runs the real Next.js Command Center against the FastAPI backend using
+Google Gemini and local repository retrieval.
 
 ## Prerequisites
 
@@ -8,6 +9,8 @@ This guide runs the real Next.js Command Center against the FastAPI backend.
 - Node.js 20+
 - npm
 - Git
+- A Gemini API key
+- A GitHub token for private repositories and GitHub code search
 
 ## 1. Start the API
 
@@ -35,11 +38,17 @@ Install the project:
 python -m pip install -e '.[dev]'
 ```
 
-Copy `.env.example` to `.env`, set `LLM_PROVIDER=gemini`, and add your Gemini
-API key to `GEMINI_API_KEY` in that ignored file. Never put the key in source or
-the web app. Azure remains available by setting `LLM_PROVIDER=azure` instead.
+Copy `.env.example` to `.env`, then set:
 
-Start the FastAPI service with the repository's actual application entrypoint:
+```env
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your_key
+GITHUB_TOKEN=your_github_token
+```
+
+Keep `.env` local and never commit it.
+
+Start the FastAPI service:
 
 ```bash
 uvicorn apps.api.app.main:app --reload --port 8000 --env-file .env
@@ -47,7 +56,7 @@ uvicorn apps.api.app.main:app --reload --port 8000 --env-file .env
 
 The API should be reachable at `http://localhost:8000`.
 
-## 2. Configure and start the web app
+## 2. Start the web app
 
 Open a second terminal:
 
@@ -58,7 +67,7 @@ npm install
 npm run dev
 ```
 
-On macOS / Linux, use:
+On macOS / Linux:
 
 ```bash
 cp .env.example .env.local
@@ -89,11 +98,16 @@ FastAPI Task API :8000
   ↓
 LangGraph orchestration
   ↓
+Gemini API
+  ↓
 Agents → MCP tools → GitHub
+  ↓
+Local repository retrieval → JSONL index
   ↓
 Evidence / verification / evaluation
 ```
 
 ## CI safety
 
-This local-demo setup does not change `.github/workflows/ci.yml` and adds no runtime dependency. The frontend API URL is configurable through `NEXT_PUBLIC_API_URL`.
+This local-demo setup does not change `.github/workflows/ci.yml` and adds no cloud
+runtime dependency. The frontend API URL is configurable through `NEXT_PUBLIC_API_URL`.

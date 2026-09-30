@@ -11,7 +11,7 @@ TOOL_DESCRIPTIONS = """Available read-only GitHub tools:
 - search_code: find relevant code; requires GITHUB_TOKEN. Arguments: {repository, query}.
 - read_file: inspect a source file. Arguments: {repository, path, ref}.
 - list_repository: explore a repository directory. Arguments: {repository, path, ref}.
-- search_repository_rag: retrieve repository code chunks using Azure AI Search hybrid retrieval. Arguments: {repository, query, ref, top_k}.\n- search_engineering_knowledge: retrieve prior verified engineering findings. Arguments: {repository, query, top_k}.
+- search_repository_rag: retrieve repository code chunks using the local repository retrieval index. Arguments: {repository, query, ref, top_k}.\n- search_engineering_knowledge: retrieve prior verified engineering findings. Arguments: {repository, query, top_k}.
 For public repositories without GITHUB_TOKEN, prefer list_repository and read_file.
 """
 

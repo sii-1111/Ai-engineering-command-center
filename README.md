@@ -38,8 +38,8 @@ flowchart TD
     G --> MEM[State + Memory]
     MEM --> PG[(PostgreSQL)]
     MEM --> REDIS[(Redis)]
-    R --> SEARCH[Azure AI Search]
-    SEARCH --> BLOB[Azure Blob Storage]
+    R --> SEARCH[Local Repository Retrieval]
+    SEARCH --> INDEX[(Local JSONL Index)]
     G --> HITL{Human Approval}
     HITL -->|approved| MCP
     HITL -->|rejected| G
@@ -54,7 +54,7 @@ flowchart TD
 - **Human-in-the-loop** — risky mutations require explicit approval.
 - **Repository intelligence** — code search, file inspection, dependency analysis, and test execution.
 - **Grounded investigation** — retrieval and evidence are carried into agent decisions.
-- **Repository indexing pipeline** — Azure Blob text ingestion, deterministic chunking, Azure OpenAI embeddings, and Azure AI Search document upserts are separated behind testable provider boundaries.
+- **Repository indexing pipeline** — local filesystem ingestion, deterministic chunking, Gemini embeddings, and a local JSONL retrieval index are separated behind testable provider boundaries.
 - **Evaluation** — tool-call success, task completion, groundedness, latency, cost, recovery, and human intervention.
 - **Observability** — capture task events, evaluation metrics, and engineering outcomes.
 - **Asynchronous execution** — Redis-backed jobs are consumed by a dedicated worker process with durable task/job status transitions and failure recording.
@@ -66,10 +66,10 @@ flowchart TD
 | Frontend | Next.js / TypeScript |
 | API | FastAPI / Python |
 | Orchestration | LangGraph |
-| Models | Azure OpenAI |
+| Models | Google Gemini API |
 | Tool protocol | MCP |
-| Retrieval | Azure AI Search |
-| Object storage | Azure Blob Storage |
+| Retrieval | Local JSONL repository index |
+| Object storage | Local filesystem |
 | State | PostgreSQL + Redis |
 | Runtime | Docker |
 | CI/CD | GitHub Actions |
@@ -124,9 +124,9 @@ flowchart TD
 ### Phase 3 — Knowledge + memory
 - [x] PostgreSQL-backed LangGraph checkpoint foundation
 - [x] Optional Redis task snapshot store and health signal
-- [x] Azure Blob ingestion adapter
+- [x] Local filesystem repository ingestion
 - [x] Repository retrieval abstraction
-- [x] Azure AI Search hybrid retrieval
+- [x] Local repository retrieval
 - [x] Deterministic repository chunking foundation
 - [x] Embedding + indexing adapter foundation
 - [x] Working memory
@@ -143,10 +143,10 @@ flowchart TD
 - [ ] Enterprise authentication and RBAC
 - [x] Production async task worker
 - [x] Bounded retries and exponential backoff
-- [ ] Azure deployment
+- [ ] Cloud deployment
 
 ## Project status
 
 **Active development — production-style AI engineering platform.**
 
-The current repository knowledge layer has provider boundaries for Blob ingestion, chunking, embeddings, and Azure AI Search indexing. The next step is wiring these primitives into the LangGraph research path so investigations can use repository-aware RAG with explicit evidence and retrieval metadata.
+The current repository knowledge layer uses provider-neutral ingestion, local filesystem storage, Gemini embeddings, and a local JSONL retrieval index. The next step is wiring these primitives into the LangGraph research path so investigations can use repository-aware retrieval with explicit evidence and retrieval metadata.

@@ -25,14 +25,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       LANGGRAPH_STRICT_MSGPACK: "true"
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_FALLBACK_MODELS: ${GEMINI_FALLBACK_MODELS:-gemini-3.7-flash,gemini-3.5-flash-lite}
       GEMINI_API_BASE_URL: ${GEMINI_API_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
-      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
-      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-10-21}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
+      LOCAL_REPOSITORY_ROOT: ${LOCAL_REPOSITORY_ROOT:-.data/repositories}
+      LOCAL_RETRIEVAL_INDEX: ${LOCAL_RETRIEVAL_INDEX:-.data/repository-index.jsonl}
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,14 +50,14 @@ services:
       REDIS_URL: redis://redis:6379/0
       LANGGRAPH_STRICT_MSGPACK: "true"
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_FALLBACK_MODELS: ${GEMINI_FALLBACK_MODELS:-gemini-3.7-flash,gemini-3.5-flash-lite}
       GEMINI_API_BASE_URL: ${GEMINI_API_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
-      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
-      AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-10-21}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-gemini-embedding-001}
+      LOCAL_REPOSITORY_ROOT: ${LOCAL_REPOSITORY_ROOT:-.data/repositories}
+      LOCAL_RETRIEVAL_INDEX: ${LOCAL_RETRIEVAL_INDEX:-.data/repository-index.jsonl}
     depends_on:
       postgres:
         condition: service_healthy

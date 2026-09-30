@@ -2,7 +2,7 @@
 
 This module provides a provider-neutral retrieval interface and a deterministic
 local implementation over evidence already collected by the investigation.
-Azure AI Search can implement the same interface without changing agents.
+A different retrieval backend can implement the same interface without changing agents.
 """
 
 from collections.abc import Iterable

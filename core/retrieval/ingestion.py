@@ -2,7 +2,7 @@
 
 The ingestion layer is intentionally provider-oriented: storage discovery and
 chunking are separate from indexing so the same pipeline can be tested locally
-and later connected to Azure Blob Storage without changing retrieval behavior.
+and later connected to another storage provider without changing retrieval behavior.
 """
 
 from dataclasses import dataclass

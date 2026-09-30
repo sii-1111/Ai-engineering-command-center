@@ -12,7 +12,7 @@ def build_search_documents(
     *,
     embedding_provider: EmbeddingProvider,
 ) -> list[dict[str, Any]]:
-    """Create Azure AI Search-compatible documents with content vectors."""
+    """Create provider-neutral documents with content vectors."""
     if not chunks:
         return []
     vectors = embedding_provider.embed([chunk.content for chunk in chunks])
