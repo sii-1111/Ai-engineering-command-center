@@ -96,20 +96,24 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
     except ToolPermissionError as exc:
         return _blocked_tool_state(state, agent, tool, exc)
     except (ValueError, RuntimeError) as exc:
+        evidence_id = f"ev-{len(evidence) + 1:03d}"
         evidence.append({
+            "id": evidence_id,
             "source": f"github://{repository}/{tool}",
             "detail": json.dumps({"error": str(exc)}),
         })
         calls.append({
-            "tool": "repository.rag",
+            "id": evidence_id,
+            "tool": call_name if "call_name" in locals() else f"github.{tool}",
             "arguments": {"repository": repository, "ref": ref, "query": args.get("query", state["task"])},
             "status": "failed",
         })
         audited = _tool_audit(state, agent, tool, True, decision.risk, "failed")
         return {**audited, "evidence": evidence, "tool_calls": calls, "status": "evidence_ready"}
 
-    evidence.append({"source": f"{call_name}://{repository}/{tool}", "detail": result})
-    calls.append({"tool": call_name, "arguments": args})
+    evidence_id = f"ev-{len(evidence) + 1:03d}"
+    evidence.append({"id": evidence_id, "source": f"{call_name}://{repository}/{tool}", "detail": result})
+    calls.append({"id": evidence_id, "tool": call_name, "arguments": args, "status": "success"})
     audited = _tool_audit(state, agent, tool, True, decision.risk, "success")
 
     return {**audited, "evidence": evidence, "tool_calls": calls, "status": "evidence_ready"}
