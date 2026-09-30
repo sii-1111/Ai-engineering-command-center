@@ -29,10 +29,13 @@ Return JSON only in one of these forms:
 or
 {{"action":"finish","report":{{"root_cause":"...","evidence":["exact evidence details"],"impact":"...","recommended_change":"...","files_involved":["path"],"confidence":0.0,"approval_required":false}}}}
 Rules for a finished report:
-- Only cite evidence present in the supplied evidence list.
+- Do not finish until at least 3 successful read-only tool calls have been collected, unless a tool fails or the repository is inaccessible.
+- Prefer a layered investigation: start with repository structure, then inspect relevant source/configuration files, then cross-check with search or repository RAG when useful.
+- When the repository structure is known, inspect concrete files rather than repeatedly listing the same directory.
+- In a finished report, cite evidence by evidence ID (for example "ev-003"). The evidence catalog is supplied with stable IDs.
 - Root cause must be a causal explanation, not merely a restatement of the task.
 - Confidence must be a number from 0.0 to 1.0.
-- List only files supported by the evidence.
+- List only files supported by the cited evidence.
 - Set approval_required=true when the recommended change would modify code, configuration, data, or infrastructure.
 - If evidence is insufficient, choose another tool instead of guessing.
 Do not invent evidence. Keep the investigation focused.
@@ -116,9 +119,19 @@ def build_dynamic_plan(state: EngineeringState) -> EngineeringState:
 def decide_next_action(state: EngineeringState) -> EngineeringState:
     if _bounded_tool_calls(state):
         return {**state, "status": "investigation_complete", "report": _bounded_report(state)}
+    if len(state.get("tool_calls", [])) < 3:
+        context_note = "You MUST choose another read-only tool because fewer than 3 successful tool calls have been collected."
+    else:
+        context_note = "You may finish only when the evidence is sufficient; otherwise choose another tool."
+
     context = json.dumps({
         "task": state["task"], "repository": state["repository"], "ref": state.get("ref", "main"),
-        "tool_calls": state.get("tool_calls", []), "evidence": state.get("evidence", []),
+        "instruction": context_note,
+        "tool_calls": state.get("tool_calls", []),
+        "evidence": [
+            {"id": item.get("id"), "source": item.get("source"), "detail": item.get("detail", "")[:12000]}
+            for item in state.get("evidence", [])
+        ],
     })
     decision = LLM().invoke_json([
         {"role": "system", "content": DECISION_SYSTEM},
