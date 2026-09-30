@@ -1,7 +1,7 @@
 # Local Command Center Demo
 
 This guide runs the real Next.js Command Center against the FastAPI backend using
-Google Gemini and local repository retrieval. No Azure credentials are required.
+Google Gemini and local repository retrieval.
 
 ## Prerequisites
 
