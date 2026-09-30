@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./theme.css";
+import "./eagle.css";
 
 export const metadata: Metadata = {
   title: "AI Engineering Command Center",
