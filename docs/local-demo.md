@@ -35,10 +35,14 @@ Install the project:
 python -m pip install -e '.[dev]'
 ```
 
+Copy `.env.example` to `.env`, set `LLM_PROVIDER=gemini`, and add your Gemini
+API key to `GEMINI_API_KEY` in that ignored file. Never put the key in source or
+the web app. Azure remains available by setting `LLM_PROVIDER=azure` instead.
+
 Start the FastAPI service with the repository's actual application entrypoint:
 
 ```bash
-uvicorn apps.api.app.main:app --reload --port 8000
+uvicorn apps.api.app.main:app --reload --port 8000 --env-file .env
 ```
 
 The API should be reachable at `http://localhost:8000`.

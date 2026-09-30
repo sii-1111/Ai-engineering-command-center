@@ -22,7 +22,11 @@ def search_repository(
     if not query.strip() or top_k <= 0:
         return []
 
-    retriever = retriever or AzureRepositoryRetriever(AzureSearchConfig.from_environment())
+    if retriever is None:
+        try:
+            retriever = AzureRepositoryRetriever(AzureSearchConfig.from_environment())
+        except ValueError:
+            return []
     if embedding_provider is None:
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
         api_key = os.getenv("AZURE_OPENAI_API_KEY", "")

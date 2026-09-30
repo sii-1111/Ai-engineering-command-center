@@ -8,16 +8,17 @@ MAX_ITERATIONS = 8
 MAX_TOOL_CALLS = 10
 
 TOOL_DESCRIPTIONS = """Available read-only GitHub tools:
-- search_code: find relevant code. Arguments: {repository, query}.
+- search_code: find relevant code; requires GITHUB_TOKEN. Arguments: {repository, query}.
 - read_file: inspect a source file. Arguments: {repository, path, ref}.
 - list_repository: explore a repository directory. Arguments: {repository, path, ref}.
 - search_repository_rag: retrieve repository code chunks using Azure AI Search hybrid retrieval. Arguments: {repository, query, ref, top_k}.\n- search_engineering_knowledge: retrieve prior verified engineering findings. Arguments: {repository, query, top_k}.
+For public repositories without GITHUB_TOKEN, prefer list_repository and read_file.
 """
 
 PLANNER_SYSTEM = f"""You are an AI software engineering investigator.
 Choose the FIRST minimal read-only investigation action for the task.
 Return JSON only: {{"tool":"search_code|list_repository|read_file|search_repository_rag|search_engineering_knowledge","arguments":{{...}}}}.
-Never modify files. Prefer search_code for an unknown implementation.
+Never modify files. Use search_code only when GITHUB_TOKEN is configured.
 {TOOL_DESCRIPTIONS}"""
 
 DECISION_SYSTEM = f"""You are an AI software engineering investigator working iteratively.
@@ -56,6 +57,23 @@ def _bounded_tool_calls(state: EngineeringState) -> bool:
 def _normalize_report(raw: dict[str, Any], evidence: list[dict[str, str]]) -> EngineeringReport:
     allowed_details = {item.get("detail", "") for item in evidence}
     cited = [str(item) for item in raw.get("evidence", []) if str(item) in allowed_details]
+    if not cited:
+        cited = [
+            detail
+            for item in evidence
+            if (detail := item.get("detail", ""))
+            and not detail.startswith("Error executing tool")
+            and '"error"' not in detail
+        ]
+        return {
+            "root_cause": "The model did not provide a conclusion supported by cited evidence.",
+            "evidence": cited,
+            "impact": "No reliable impact assessment was produced.",
+            "recommended_change": "Review the collected evidence and retry with a focused task.",
+            "files_involved": [],
+            "confidence": 0.0,
+            "approval_required": False,
+        }
     try:
         confidence = float(raw.get("confidence", 0.0))
     except (TypeError, ValueError):

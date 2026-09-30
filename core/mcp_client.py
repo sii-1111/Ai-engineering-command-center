@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from typing import Any
 
 from mcp.client.stdio import stdio_client
@@ -15,7 +16,7 @@ async def call_github_tool(
 ) -> str:
     DEFAULT_TOOL_POLICY.enforce(agent, tool_name)
     server = StdioServerParameters(
-        command=os.getenv("PYTHON_BIN", "python"),
+        command=os.getenv("PYTHON_BIN") or sys.executable,
         args=["-m", "tooling.github.server"],
         env=dict(os.environ),
     )

@@ -11,6 +11,27 @@ SEARCH_EVIDENCE = (
 )
 
 
+def test_uncited_report_is_inconclusive_and_preserves_collected_evidence() -> None:
+    detail = '{"path":"README","content":"Hello World!"}'
+
+    report = llm_planner._normalize_report(
+        {
+            "root_cause": "The task asks to read the README.",
+            "evidence": [],
+            "impact": "None",
+            "recommended_change": "No changes required.",
+            "files_involved": ["README"],
+            "confidence": 1.0,
+            "approval_required": False,
+        },
+        [{"source": "github://owner/repo/README", "detail": detail}],
+    )
+
+    assert report["root_cause"].startswith("The model did not provide")
+    assert report["evidence"] == [detail]
+    assert report["confidence"] == 0.0
+
+
 class FakeLLM:
     calls = 0
 
@@ -196,8 +217,9 @@ def test_report_rejects_unsupported_evidence_and_clamps_confidence(monkeypatch) 
         "status": "started",
     }, config=_config())
 
-    assert result["report"]["evidence"] == []
-    assert result["report"]["confidence"] == 1.0
+    assert result["report"]["evidence"] == [SEARCH_EVIDENCE]
+    assert result["report"]["confidence"] == 0.0
+    assert result["report"]["root_cause"].startswith("The model did not provide")
 
 
 def test_graph_requires_repository(monkeypatch) -> None:
