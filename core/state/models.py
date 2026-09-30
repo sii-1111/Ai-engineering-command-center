@@ -2,6 +2,7 @@ from typing import TypedDict
 
 
 class Evidence(TypedDict):
+    id: str
     source: str
     detail: str
 

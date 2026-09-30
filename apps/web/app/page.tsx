@@ -27,10 +27,113 @@ const metrics = [
   { label: "Approval loop", value: "HITL" },
 ];
 
+function InvestigationResult({ result }: { result: Record<string, unknown> }) {
+  const report = (result.report ?? {}) as Record<string, unknown>;
+  const evidence = Array.isArray(result.evidence) ? result.evidence : [];
+  const toolCalls = Array.isArray(result.tool_calls) ? result.tool_calls : [];
+  const review = (result.review ?? {}) as Record<string, unknown>;
+  const verification = (result.verification_result ?? {}) as Record<string, unknown>;
+  const status = String(result.status ?? "completed");
+  const confidence = Number(report.confidence ?? 0);
+  const confidencePct = Math.round(Math.max(0, Math.min(1, confidence)) * 100);
+  const evidenceItems = evidence.map((item, index) => {
+    const entry = (item ?? {}) as Record<string, unknown>;
+    return {
+      id: String(entry.id ?? `ev-${String(index + 1).padStart(3, "0")}`),
+      source: String(entry.source ?? "repository evidence"),
+      detail: String(entry.detail ?? ""),
+    };
+  });
+
+  return (
+    <div className="investigation-result">
+      <div className="result-summary">
+        <div>
+          <span className="result-kicker">Investigation complete</span>
+          <h3>{status.replaceAll("_", " ")}</h3>
+        </div>
+        <div className="confidence-ring">
+          <strong>{confidencePct}%</strong>
+          <span>confidence</span>
+        </div>
+      </div>
+
+      <div className="result-grid">
+        <div className="result-card result-card-wide">
+          <span className="result-label">Root cause</span>
+          <p>{String(report.root_cause ?? "No root cause established.")}</p>
+        </div>
+        <div className="result-card">
+          <span className="result-label">Impact</span>
+          <p>{String(report.impact ?? "Not established.")}</p>
+        </div>
+        <div className="result-card">
+          <span className="result-label">Recommended change</span>
+          <p>{String(report.recommended_change ?? "No change recommended.")}</p>
+        </div>
+      </div>
+
+      <div className="result-section">
+        <div className="result-section-heading">
+          <div>
+            <span className="result-label">Evidence</span>
+            <h4>What the agent actually inspected</h4>
+          </div>
+          <span className="result-count">{evidenceItems.length} items</span>
+        </div>
+        <div className="evidence-items">
+          {evidenceItems.slice(0, 8).map((item) => (
+            <details key={item.id} className="evidence-item">
+              <summary>
+                <span className="evidence-id">{item.id}</span>
+                <span>{item.source}</span>
+              </summary>
+              <pre>{item.detail}</pre>
+            </details>
+          ))}
+        </div>
+      </div>
+
+      <div className="result-section">
+        <div className="result-section-heading">
+          <div>
+            <span className="result-label">Agent execution</span>
+            <h4>MCP investigation timeline</h4>
+          </div>
+          <span className="result-count">{toolCalls.length} calls</span>
+        </div>
+        <div className="tool-timeline">
+          {toolCalls.map((item, index) => {
+            const call = (item ?? {}) as Record<string, unknown>;
+            return (
+              <div className="tool-step" key={String(call.id ?? index)}>
+                <span className="tool-step-index">0{index + 1}</span>
+                <div>
+                  <strong>{String(call.tool ?? "tool")}</strong>
+                  <span>{String((call.arguments as Record<string, unknown> | undefined)?.path ?? (call.arguments as Record<string, unknown> | undefined)?.query ?? "repository context")}</span>
+                </div>
+                <em>{String(call.status ?? "success")}</em>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="result-footer">
+        <span>Files involved: {Array.isArray(report.files_involved) ? report.files_involved.length : 0}</span>
+        <span>Approval: {String(result.approval_status ?? (report.approval_required ? "required" : "not required")).replaceAll("_", " ")}</span>
+        <span>Verification: {String(result.verification_status ?? "not started").replaceAll("_", " ")}</span>
+        {Boolean(review.decision) && <span>Review: {String(review.decision)}</span>}
+        {verification.passed === true && <span className="verified-badge">✓ verified</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [formOpen, setFormOpen] = useState(false);
   const [task, setTask] = useState("Investigate the repository and identify its main components and potential risks.");
-  const [repository, setRepository] = useState("octocat/Hello-World");
+  const [repository, setRepository] = useState("sii-1111/Ai-engineering-command-center");
   const [ref, setRef] = useState("main");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
@@ -172,8 +275,11 @@ export default function Home() {
             {error && <p className="task-message error" role="alert">{error}</p>}
             {result && (
               <div className="task-result" aria-live="polite">
-                <div><strong>Task {String(result.status ?? "submitted")}</strong><span>{result.task_id ? `ID ${String(result.task_id)}` : ""}</span></div>
-                <pre>{JSON.stringify(result, null, 2)}</pre>
+                <div className="task-result-header">
+                  <strong>Task {String(result.status ?? "submitted").replaceAll("_", " ")}</strong>
+                  <span>{result.task_id ? `ID ${String(result.task_id)}` : ""}</span>
+                </div>
+                <InvestigationResult result={result} />
               </div>
             )}
           </section>
@@ -496,6 +602,184 @@ export default function Home() {
           border: 1px solid rgba(255, 142, 142, 0.4);
           background: rgba(128, 30, 36, 0.22);
           color: #ffd4d4;
+        }
+
+        .investigation-result {
+          padding: 18px;
+        }
+
+        .task-result-header {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 12px 14px;
+          border-bottom: 1px solid rgba(194, 215, 240, 0.14);
+        }
+
+        .result-summary {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin-bottom: 18px;
+        }
+
+        .result-kicker,
+        .result-label {
+          display: block;
+          color: rgba(200, 221, 242, 0.68);
+          font-size: 0.67rem;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+        }
+
+        .result-summary h3 {
+          margin: 6px 0 0;
+          font-size: 1.25rem;
+          text-transform: capitalize;
+        }
+
+        .confidence-ring {
+          min-width: 78px;
+          min-height: 78px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(102, 240, 193, 0.3);
+          border-radius: 50%;
+          background: rgba(102, 240, 193, 0.06);
+        }
+
+        .confidence-ring strong { font-size: 1.1rem; }
+        .confidence-ring span { font-size: 0.55rem; color: var(--soft); }
+
+        .result-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+        }
+
+        .result-card {
+          padding: 16px;
+          border: 1px solid rgba(194, 215, 240, 0.12);
+          border-radius: 12px;
+          background: rgba(255,255,255,0.018);
+        }
+
+        .result-card-wide { grid-column: 1 / -1; }
+        .result-card p { margin: 8px 0 0; color: var(--muted); line-height: 1.55; font-size: 0.82rem; }
+
+        .result-section { margin-top: 22px; }
+
+        .result-section-heading {
+          display: flex;
+          align-items: end;
+          justify-content: space-between;
+          gap: 14px;
+          margin-bottom: 10px;
+        }
+
+        .result-section-heading h4 { margin: 5px 0 0; font-size: 0.98rem; }
+        .result-count { color: var(--soft); font-size: 0.68rem; }
+
+        .evidence-items,
+        .tool-timeline {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .evidence-item {
+          border: 1px solid rgba(194, 215, 240, 0.1);
+          border-radius: 10px;
+          background: rgba(255,255,255,0.015);
+          overflow: hidden;
+        }
+
+        .evidence-item summary {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 11px 12px;
+          cursor: pointer;
+          list-style: none;
+          color: var(--muted);
+          font-size: 0.72rem;
+        }
+
+        .evidence-id {
+          padding: 4px 7px;
+          border-radius: 6px;
+          background: rgba(145, 188, 255, 0.1);
+          color: var(--accent);
+          font-size: 0.62rem;
+        }
+
+        .evidence-item pre {
+          max-height: 220px;
+          overflow: auto;
+          margin: 0;
+          padding: 12px;
+          border-top: 1px solid rgba(194, 215, 240, 0.08);
+          color: #cbddec;
+          font-size: 0.67rem;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+
+        .tool-step {
+          display: grid;
+          grid-template-columns: 34px 1fr auto;
+          align-items: center;
+          gap: 10px;
+          padding: 10px;
+          border: 1px solid rgba(194, 215, 240, 0.1);
+          border-radius: 10px;
+          background: rgba(255,255,255,0.015);
+        }
+
+        .tool-step-index {
+          display: grid;
+          place-items: center;
+          width: 30px;
+          height: 30px;
+          border-radius: 9px;
+          background: rgba(102, 240, 193, 0.1);
+          color: #bfffe9;
+          font-size: 0.62rem;
+          font-weight: 700;
+        }
+
+        .tool-step strong,
+        .tool-step span {
+          display: block;
+        }
+
+        .tool-step strong { font-size: 0.76rem; }
+        .tool-step span { margin-top: 3px; color: var(--soft); font-size: 0.63rem; }
+        .tool-step em { color: #bfffe9; font-size: 0.62rem; font-style: normal; text-transform: uppercase; }
+
+        .result-footer {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .result-footer span {
+          padding: 7px 9px;
+          border-radius: 999px;
+          border: 1px solid rgba(194, 215, 240, 0.1);
+          color: var(--soft);
+          font-size: 0.63rem;
+        }
+
+        .result-footer .verified-badge {
+          color: #bfffe9;
+          border-color: rgba(102, 240, 193, 0.25);
+          background: rgba(102, 240, 193, 0.08);
         }
 
         .task-result {
