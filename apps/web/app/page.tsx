@@ -123,7 +123,7 @@ function InvestigationResult({ result }: { result: Record<string, unknown> }) {
         <span>Files involved: {Array.isArray(report.files_involved) ? report.files_involved.length : 0}</span>
         <span>Approval: {String(result.approval_status ?? (report.approval_required ? "required" : "not required")).replaceAll("_", " ")}</span>
         <span>Verification: {String(result.verification_status ?? "not started").replaceAll("_", " ")}</span>
-        {review.decision && <span>Review: {String(review.decision)}</span>}
+        {Boolean(review.decision) && <span>Review: {String(review.decision)}</span>}
         {verification.passed === true && <span className="verified-badge">✓ verified</span>}
       </div>
     </div>
