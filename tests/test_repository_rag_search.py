@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from core.retrieval.local_search import LocalRepositoryRetriever, LocalSearchConfig
+from core.retrieval.local_search import LocalRepositoryRetriever
 from core.retrieval.search import search_repository
 
 
