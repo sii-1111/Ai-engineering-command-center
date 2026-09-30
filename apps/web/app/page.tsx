@@ -131,6 +131,7 @@ function InvestigationResult({ result }: { result: Record<string, unknown> }) {
 }
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState("overview");
   const [formOpen, setFormOpen] = useState(false);
   const [task, setTask] = useState("Investigate the repository and identify its main components and potential risks.");
   const [repository, setRepository] = useState("sii-1111/Ai-engineering-command-center");
@@ -202,10 +203,23 @@ export default function Home() {
           </a>
 
           <nav className="menu" aria-label="Main navigation">
-            <a href="#overview">Overview</a>
-            <a href="#repositories">Repositories</a>
-            <a href="#agents">Agents</a>
-            <a href="#evidence">Evidence</a>
+            {[
+              ["overview", "Overview"],
+              ["repositories", "Repositories"],
+              ["agents", "Agents"],
+              ["evidence", "Evidence"],
+            ].map(([tab, label]) => (
+              <button
+                key={tab}
+                className={`menu-tab ${activeTab === tab ? "active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
 
           <button className="pill" type="button" onClick={() => openInvestigation()}>Open workspace</button>
@@ -285,77 +299,85 @@ export default function Home() {
           </section>
         )}
 
-        <section className="dashboard" aria-label="Repository and workflow dashboard">
-          <article className="panel repo-panel" id="repositories">
-            <div className="panel-header">
-              <span className="kicker">Repo</span>
-              <span className="live-dot" aria-label="Live repository status" />
-            </div>
+        {activeTab !== "overview" && (
+          <section className="dashboard" aria-label={`${activeTab} workspace`} role="tabpanel">
+            {activeTab === "repositories" && (
+              <article className="panel repo-panel">
+                <div className="panel-header">
+                  <span className="kicker">Repo</span>
+                  <span className="live-dot" aria-label="Live repository status" />
+                </div>
 
-            <h2>AI Engineering Command Center</h2>
+                <h2>AI Engineering Command Center</h2>
 
-            <div className="repo-meta">
-              <span>main</span>
-              <span>Evidence-backed agent workflows</span>
-            </div>
+                <div className="repo-meta">
+                  <span>main</span>
+                  <span>Evidence-backed agent workflows</span>
+                </div>
 
-            <ul className="module-list">
-              {repoModules.map((module) => (
-                <li key={module}>
-                  <span className="module-name">{module}</span>
-                  <span className="module-status success">ready</span>
-                </li>
-              ))}
-            </ul>
-          </article>
+                <ul className="module-list">
+                  {repoModules.map((module) => (
+                    <li key={module}>
+                      <span className="module-name">{module}</span>
+                      <span className="module-status success">ready</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            )}
 
-          <article className="panel pipeline-panel" id="agents">
-            <div className="panel-header">
-              <span className="kicker">Workflow</span>
-            </div>
+            {activeTab === "agents" && (
+              <article className="panel pipeline-panel">
+                <div className="panel-header">
+                  <span className="kicker">Workflow</span>
+                </div>
 
-            <h2>Investigation pipeline</h2>
+                <h2>Investigation pipeline</h2>
 
-            <div className="pipeline-list">
-              {agentFlow.map((step, index) => (
-                <div key={step.title} className="pipeline-step">
-                  <span className="step-index">0{index + 1}</span>
+                <div className="pipeline-list">
+                  {agentFlow.map((step, index) => (
+                    <div key={step.title} className="pipeline-step">
+                      <span className="step-index">0{index + 1}</span>
+                      <div>
+                        <strong>{step.title}</strong>
+                        <p>{step.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            )}
+
+            {activeTab === "evidence" && (
+              <article className="panel evidence-panel">
+                <div className="panel-header">
+                  <span className="kicker">Evidence</span>
+                </div>
+
+                <h2>Verification stack</h2>
+
+                <div className="evidence-grid">
                   <div>
-                    <strong>{step.title}</strong>
-                    <p>{step.text}</p>
+                    <span className="label">MCP tools</span>
+                    <strong>GitHub + search + repo</strong>
+                  </div>
+                  <div>
+                    <span className="label">Retrieval</span>
+                    <strong>Local retrieval + Gemini embeddings</strong>
+                  </div>
+                  <div>
+                    <span className="label">State</span>
+                    <strong>Redis + LangGraph</strong>
+                  </div>
+                  <div>
+                    <span className="label">Review</span>
+                    <strong>Human approval loop</strong>
                   </div>
                 </div>
-              ))}
-            </div>
-          </article>
-
-          <article className="panel evidence-panel" id="evidence">
-            <div className="panel-header">
-              <span className="kicker">Evidence</span>
-            </div>
-
-            <h2>Verification stack</h2>
-
-            <div className="evidence-grid">
-              <div>
-                <span className="label">MCP tools</span>
-                <strong>GitHub + search + repo</strong>
-              </div>
-              <div>
-                <span className="label">Retrieval</span>
-                <strong>Local retrieval + Gemini embeddings</strong>
-              </div>
-              <div>
-                <span className="label">State</span>
-                <strong>Redis + LangGraph</strong>
-              </div>
-              <div>
-                <span className="label">Review</span>
-                <strong>Human approval loop</strong>
-              </div>
-            </div>
-          </article>
-        </section>
+              </article>
+            )}
+          </section>
+        )}
       </div>
 
       <style jsx global>{`
@@ -464,26 +486,37 @@ export default function Home() {
           color: var(--muted);
         }
 
-        .menu a {
+        .menu-tab {
           position: relative;
+          border: 0;
+          padding: 4px 0;
+          background: transparent;
+          color: var(--muted);
+          font: inherit;
+          font-size: 0.82rem;
           transition: color 0.2s ease;
         }
 
-        .menu a::after {
+        .menu-tab::after {
           content: "";
           position: absolute;
           left: 0;
+          right: 0;
           bottom: -8px;
-          width: 100%;
           height: 1px;
-          background: rgba(197, 216, 239, 0.7);
+          background: rgba(197, 216, 239, 0.8);
           transform: scaleX(0);
           transform-origin: center;
           transition: transform 0.2s ease;
         }
 
-        .menu a:hover::after,
-        .menu a:focus-visible::after { transform: scaleX(1); }
+        .menu-tab:hover,
+        .menu-tab.active,
+        .menu-tab:focus-visible { color: var(--ink); }
+
+        .menu-tab:hover::after,
+        .menu-tab.active::after,
+        .menu-tab:focus-visible::after { transform: scaleX(1); }
 
         .pill {
           display: inline-flex;
