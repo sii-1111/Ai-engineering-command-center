@@ -35,13 +35,11 @@ Install the project:
 python -m pip install -e '.[dev]'
 ```
 
-Start the FastAPI service using the repository's API entrypoint:
+Start the FastAPI service with the repository's actual application entrypoint:
 
 ```bash
-uvicorn <api-module>:app --reload --port 8000
+uvicorn apps.api.app.main:app --reload --port 8000
 ```
-
-> Replace `<api-module>` with the module containing the repository's FastAPI `app` object.
 
 The API should be reachable at `http://localhost:8000`.
 
