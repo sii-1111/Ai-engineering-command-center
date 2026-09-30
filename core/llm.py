@@ -2,33 +2,22 @@ import json
 import os
 from typing import Any
 
-from openai import APIStatusError, AzureOpenAI, OpenAI
+from openai import APIStatusError, OpenAI
 
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 def selected_provider() -> str:
     configured = os.getenv("LLM_PROVIDER", "").strip().lower()
-    if configured:
-        return configured
-    if os.getenv("GEMINI_API_KEY"):
-        return "gemini"
-    if any(os.getenv(name) for name in ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT")):
-        return "azure"
-    return "gemini"
+    return configured or "gemini"
 
 
 def llm_configuration_error() -> str | None:
     provider = selected_provider()
-    if provider == "gemini":
-        missing = [name for name in ("GEMINI_API_KEY",) if not os.getenv(name)]
-    elif provider == "azure":
-        required = ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT")
-        missing = [name for name in required if not os.getenv(name)]
-    else:
-        return "LLM_PROVIDER must be 'gemini' or 'azure'."
-    if missing:
-        return f"Set backend environment variables: {', '.join(missing)}"
+    if provider != "gemini":
+        return "LLM_PROVIDER must be 'gemini'."
+    if not os.getenv("GEMINI_API_KEY"):
+        return "Set backend environment variables: GEMINI_API_KEY"
     return None
 
 
@@ -38,21 +27,12 @@ class LLM:
         if configuration_error:
             raise ValueError(configuration_error)
 
-        provider = selected_provider()
-        self.provider = provider
-        if provider == "gemini":
-            self.client = OpenAI(
-                api_key=os.environ["GEMINI_API_KEY"],
-                base_url=os.getenv("GEMINI_API_BASE_URL", GEMINI_API_BASE_URL),
-            )
-            self.deployment = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-        else:
-            self.client = AzureOpenAI(
-                api_key=os.environ["AZURE_OPENAI_API_KEY"],
-                azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21"),
-            )
-            self.deployment = os.environ["AZURE_OPENAI_DEPLOYMENT"]
+        self.provider = "gemini"
+        self.client = OpenAI(
+            api_key=os.environ["GEMINI_API_KEY"],
+            base_url=os.getenv("GEMINI_API_BASE_URL", GEMINI_API_BASE_URL),
+        )
+        self.deployment = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
     def invoke(self, messages: list[dict[str, str]]) -> str:
         response = self._create_completion(messages)
@@ -73,7 +53,7 @@ class LLM:
         try:
             return self.client.chat.completions.create(**request)
         except APIStatusError as exc:
-            if self.provider != "gemini" or exc.status_code not in {429, 503}:
+            if exc.status_code not in {429, 503}:
                 raise
             fallback_models = os.getenv(
                 "GEMINI_FALLBACK_MODELS",
