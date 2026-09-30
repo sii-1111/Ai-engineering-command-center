@@ -1,7 +1,7 @@
 from unittest.mock import Mock, patch
 
-import pytest
 import httpx
+import pytest
 
 from tooling.github.client import GitHubClient
 
