@@ -97,7 +97,7 @@ def execute_next_tool(state: EngineeringState) -> EngineeringState:
         return _blocked_tool_state(state, agent, tool, exc)
     except (ValueError, RuntimeError) as exc:
         evidence.append({
-            "source": f"repository-rag://{repository}/{ref}",
+            "source": f"github://{repository}/{tool}",
             "detail": json.dumps({"error": str(exc)}),
         })
         calls.append({
