@@ -23,7 +23,16 @@ class GitHubClient:
             timeout=20.0,
             **kwargs,
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            try:
+                detail = response.json().get("message", response.text)
+            except ValueError:
+                detail = response.text
+            raise RuntimeError(
+                f"GitHub API request failed ({response.status_code}): {detail}"
+            ) from exc
         return response.json()
 
     def _get(self, path: str, params: dict[str, str] | None = None) -> Any:
