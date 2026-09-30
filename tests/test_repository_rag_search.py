@@ -37,6 +37,15 @@ def test_search_repository_scopes_results_to_repository_and_ref(retriever_cls):
     )
 
 
+@patch("core.retrieval.search.AzureRepositoryRetriever")
+def test_search_repository_skips_when_azure_search_is_not_configured(retriever_cls, monkeypatch):
+    monkeypatch.delenv("AZURE_SEARCH_ENDPOINT", raising=False)
+    monkeypatch.delenv("AZURE_SEARCH_API_KEY", raising=False)
+
+    assert search_repository("find a function", repository="owner/repo") == []
+    retriever_cls.assert_not_called()
+
+
 @patch("core.retrieval.azure_search.SearchClient")
 def test_azure_retriever_passes_repository_and_ref_filter(search_client):
     search_client.return_value.search.return_value = []

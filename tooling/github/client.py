@@ -6,23 +6,37 @@ import httpx
 
 class GitHubClient:
     def __init__(self) -> None:
-        token = os.getenv("GITHUB_TOKEN")
-        if not token:
-            raise RuntimeError("GITHUB_TOKEN is required for GitHub MCP tools.")
-        self.token = token
+        self.token = os.getenv("GITHUB_TOKEN", "").strip()
+
+    def _require_write_token(self) -> None:
+        if not self.token:
+            raise RuntimeError("GITHUB_TOKEN is required for GitHub write operations.")
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        if method.upper() != "GET":
+            self._require_write_token()
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
         response = httpx.request(
             method,
             f"https://api.github.com{path}",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "Authorization": f"Bearer {self.token}",
-            },
+            headers=headers,
             timeout=20.0,
             **kwargs,
         )
+        if method.upper() == "GET" and self.token and response.status_code == 401:
+            anonymous_headers = {key: value for key, value in headers.items() if key != "Authorization"}
+            response = httpx.request(
+                method,
+                f"https://api.github.com{path}",
+                headers=anonymous_headers,
+                timeout=20.0,
+                **kwargs,
+            )
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -42,13 +56,22 @@ class GitHubClient:
         return self._get(f"/repos/{repository}/contents/{path}", {"ref": ref})
 
     def search_code(self, repository: str, query: str) -> Any:
-        return self._get("/search/code", {"q": f"{query} repo:{repository}", "per_page": "20"})
+        guidance = "GitHub code search requires GITHUB_TOKEN; use list_repository and read_file for public repositories."
+        if not self.token:
+            return {"items": [], "warning": guidance}
+        try:
+            return self._get("/search/code", {"q": f"{query} repo:{repository}", "per_page": "20"})
+        except RuntimeError as exc:
+            if "GitHub API request failed (401)" in str(exc):
+                return {"items": [], "warning": guidance}
+            raise
 
     def list_repository(self, repository: str, path: str = "", ref: str = "main") -> Any:
         endpoint = f"/repos/{repository}/contents/{path}".rstrip("/")
         return self._get(endpoint, {"ref": ref})
 
     def create_branch(self, repository: str, branch: str, base_ref: str = "main") -> Any:
+        self._require_write_token()
         base = self._get(f"/repos/{repository}/git/ref/heads/{base_ref}")
         return self._request(
             "POST",
@@ -65,6 +88,7 @@ class GitHubClient:
         message: str,
         sha: str,
     ) -> Any:
+        self._require_write_token()
         import base64
 
         return self._request(
@@ -86,6 +110,7 @@ class GitHubClient:
         head: str,
         base: str = "main",
     ) -> Any:
+        self._require_write_token()
         return self._request(
             "POST",
             f"/repos/{repository}/pulls",

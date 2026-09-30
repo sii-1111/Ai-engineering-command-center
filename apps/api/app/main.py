@@ -5,12 +5,14 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from langgraph.types import Command
+from openai import APIError, APIStatusError
 from pydantic import BaseModel, Field
 
 from agents.tool_executor import verify_change
 from apps.api.app.observability import get_task_observability
 from core.evaluation import evaluate_task
 from core.graph import build_graph
+from core.llm import llm_configuration_error
 from core.security.access import authenticate_token, authorize_task
 from core.security.audit import audit_event
 from core.store.jobs import JobStore
@@ -55,12 +57,16 @@ def _serialize_result(task_id: str, result: dict) -> dict:
             "status": "awaiting_approval",
             "approval_request": request,
             "report": result.get("report", {}),
+            "evidence": result.get("evidence", []),
+            "tool_calls": result.get("tool_calls", []),
             "final_report": result.get("final_report", ""),
         }
     return {
         "task_id": task_id,
         "status": result.get("status", "completed"),
         "report": result.get("report", {}),
+        "evidence": result.get("evidence", []),
+        "tool_calls": result.get("tool_calls", []),
         "final_report": result.get("final_report", ""),
         "approval_status": result.get("approval_status", "not_required"),
         "verification_status": result.get("verification_status", "not_started"),
@@ -81,7 +87,7 @@ async def health() -> dict[str, str]:
 
 
 @app.post("/v1/tasks")
-async def create_task(request: TaskRequest, authorization: str | None = Depends(api_key)) -> dict:
+def create_task(request: TaskRequest, authorization: str | None = Depends(api_key)) -> dict:
     principal = authenticate_token(authorization.removeprefix("Bearer ").strip() if authorization else None)
     if principal is None and os.getenv("COMMAND_CENTER_API_TOKEN"):
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -90,22 +96,36 @@ async def create_task(request: TaskRequest, authorization: str | None = Depends(
             authorize_task(principal, "task:create")
         except PermissionError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
+    configuration_error = llm_configuration_error()
+    if configuration_error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Task execution is not configured. {configuration_error}",
+        )
     task_id = str(uuid4())
     task_store.save(build_task_record(task_id, request.task, request.repository, request.ref))
-    result = graph.invoke(
-        {
-            "task": request.task,
-            "repository": request.repository,
-            "ref": request.ref,
-            "task_id": task_id,
-            "evidence": [],
-            "findings": [],
-            "tool_calls": [],
-            "status": "started",
-            "observability_events": [{"timestamp": "task-created", "event": "task_started"}],
-        },
-        config=_config(task_id),
-    )
+    try:
+        result = graph.invoke(
+            {
+                "task": request.task,
+                "repository": request.repository,
+                "ref": request.ref,
+                "task_id": task_id,
+                "evidence": [],
+                "findings": [],
+                "tool_calls": [],
+                "status": "started",
+                "observability_events": [{"timestamp": "task-created", "event": "task_started"}],
+            },
+            config=_config(task_id),
+        )
+    except APIError as exc:
+        upstream_status = exc.status_code if isinstance(exc, APIStatusError) else None
+        status_code = upstream_status if upstream_status in {429, 503} else 502
+        raise HTTPException(
+            status_code=status_code,
+            detail=f"LLM provider request failed ({upstream_status or 'connection error'}). Check provider availability and retry.",
+        ) from exc
     save_task_snapshot(task_id, result)
     task_store.update(task_id, status=result.get("status", "completed"))
     return {**_serialize_result(task_id, result), "audit": audit_event(subject=principal.subject if principal else "anonymous", action="task.create", resource=task_id, outcome="success")}

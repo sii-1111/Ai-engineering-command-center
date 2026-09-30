@@ -1,7 +1,10 @@
 import base64
 import json
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.fastmcp import FastMCP
+except ModuleNotFoundError:
+    from mcp.server.mcpserver import MCPServer as FastMCP
 
 from tooling.github.client import GitHubClient
 
@@ -31,13 +34,16 @@ def read_file(repository: str, path: str, ref: str = "main") -> str:
 def search_code(repository: str, query: str) -> str:
     """Search GitHub code within one repository."""
     result = client().search_code(repository, query)
-    return json.dumps({
+    response = {
         "query": query,
         "matches": [
             {"path": item.get("path"), "sha": item.get("sha"), "url": item.get("html_url")}
             for item in result.get("items", [])
         ],
-    })
+    }
+    if result.get("warning"):
+        response["warning"] = result["warning"]
+    return json.dumps(response)
 
 
 @mcp.tool()

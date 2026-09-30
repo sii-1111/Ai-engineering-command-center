@@ -1,11 +1,861 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useRef, useState } from "react";
+import type { FormEvent } from "react";
 
-type Stage = { name: string; state: "done" | "active" | "idle" };
-type TaskResult = { task_id:string; status:string; approval_status?:string; approval_request?:unknown; report?:Record<string,unknown>; final_report?:string; verification_status?:string; verification_result?:Record<string,unknown>; pull_request?:Record<string,unknown>; review?:Record<string,unknown>; evaluation?:Record<string,unknown>; observability_events?:Array<Record<string,unknown>> };
-const stageNames=["Planner","Repository investigation","Root-cause analysis","Human approval","Code change","Verification","Reviewer"];
-function stagesFor(data?:TaskResult):Stage[]{if(!data)return stageNames.map(name=>({name,state:"idle"}));const review=data.review||{};const states:Stage[]=stageNames.map(name=>({name,state:"idle"}));states[0].state="done";states[1].state="done";states[2].state=data.report?"done":"active";if(data.status==="awaiting_approval")states[3].state="active";else if(data.approval_status&&data.approval_status!=="not_required")states[3].state="done";if(data.pull_request&&Object.keys(data.pull_request).length)states[4].state="done";else if(data.approval_status==="approved")states[4].state="active";if(data.verification_status==="passed"||data.verification_status==="failed")states[5].state="done";else if(data.pull_request&&Object.keys(data.pull_request).length)states[5].state="active";if(Object.keys(review).length)states[6].state="done";else if(data.verification_status==="passed"||data.verification_status==="failed")states[6].state="active";return states}
-function metricValue(data:TaskResult|undefined,key:string){const e=data?.evaluation||{};const v:Record<string,unknown>={Evidence:e.evidence_count??data?.report?.evidence_count,"Tool calls":e.tool_call_count,Confidence:e.confidence!=null?`${Math.round(Number(e.confidence)*100)}%`:undefined,Latency:e.latency_seconds!=null?`${Number(e.latency_seconds).toFixed(1)}s`:undefined};return v[key]==null?"—":String(v[key])}
-function statusTone(status?:string){if(status==="completed"||status==="passed")return"good";if(status==="awaiting_approval"||status==="running")return"warn";if(status==="failed"||status==="rejected")return"danger";return"neutral"}
-export default function Home(){const[task,setTask]=useState("Analyze this repository and find why the /search endpoint is slow. Identify the root cause, propose a fix, run tests, and prepare the change for review.");const[repo,setRepo]=useState("sii-1111/Ai-engineering-command-center");const[running,setRunning]=useState(false);const[data,setData]=useState<TaskResult>();const[error,setError]=useState("");const api=process.env.NEXT_PUBLIC_API_URL??"http://localhost:8000";const stages=useMemo(()=>stagesFor(data),[data]);const metrics=["Evidence","Tool calls","Confidence","Latency"];const evidence=Array.isArray(data?.report?.evidence)?data.report.evidence as unknown[]:[];const events=data?.observability_events??[];const waitingApproval=data?.status==="awaiting_approval";const quality=data?.evaluation?.overall_score??data?.evaluation?.overall??"—";const verification=data?.verification_status??"not started";const reportText=data?.final_report||(data?.report?JSON.stringify(data.report,null,2):"Run an investigation to populate live engineering evidence.");useEffect(()=>{if(!data?.task_id||data.status==="completed")return;const timer=window.setInterval(async()=>{try{const res=await fetch(`${api}/v1/tasks/${data.task_id}`);if(res.ok)setData(await res.json())}catch{}},2000);return()=>window.clearInterval(timer)},[api,data?.task_id,data?.status]);async function runTask(){setRunning(true);setError("");setData(undefined);try{const res=await fetch(`${api}/v1/tasks`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task,repository:repo,ref:"main"})});if(!res.ok)throw new Error(`Task API returned ${res.status}`);setData(await res.json())}catch(e){setError(e instanceof Error?e.message:"Unable to start task")}finally{setRunning(false)}}async function approval(value:boolean){if(!data?.task_id)return;setRunning(true);setError("");try{const res=await fetch(`${api}/v1/tasks/${data.task_id}/approval`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({approved:value})});if(!res.ok)throw new Error(`Approval API returned ${res.status}`);setData(await res.json())}catch(e){setError(e instanceof Error?e.message:"Unable to submit approval")}finally{setRunning(false)}}return <div className="shell"><div className="eagle-flight" aria-hidden="true"><div className="flight-word">COMMAND</div><video className="bird-video" autoPlay muted playsInline loop preload="auto" aria-hidden="true"><source src="https://thinkingpods.com/demos/kingfisher-hero/hero.mp4" type="video/mp4" /></video></div><aside className="sidebar"><div className="brand"><div className="logo">✦</div><span>AI Command Center</span></div><div className="workspace"><span className="workspace-dot"/>Engineering workspace</div><nav className="nav"><div className="active"><span>⌁</span> Command Center</div><div><span>◌</span> Investigations</div><div><span>◇</span> Evidence</div><div><span>◫</span> Evaluations</div><div><span>⚙</span> Settings</div></nav><div className="sidefoot"><span>ONLINE</span><br/>LangGraph · MCP · GitHub<br/>Azure OpenAI · Azure AI Search</div></aside><main><header className="top"><div><div className="eyebrow">AI ENGINEERING / COMMAND CENTER</div><h1 className="title">From engineering question to verified outcome.</h1><div className="sub">Investigate with evidence. Mutate only with approval. Verify every change.</div></div><div className={`status ${statusTone(data?.status)}`}><i/> {data?.status?.replaceAll("_"," ").toUpperCase()??"SYSTEM READY"}</div></header><section className="hero-grid"><div className="panel task-panel"><div className="panel-head"><div><span className="section-kicker">01 / COMMAND</span><h2>New engineering task</h2></div><span className="mono">POST /v1/tasks</span></div><textarea className="taskbox" value={task} onChange={e=>setTask(e.target.value)}/><div className="controls"><input className="input" value={repo} onChange={e=>setRepo(e.target.value)} aria-label="Repository"/><button className="primary" onClick={runTask} disabled={running}>{running?"Executing…":"Run investigation →"}</button></div>{error&&<div className="error">{error}</div>}</div><div className="panel pipeline-panel"><div className="panel-head"><div><span className="section-kicker">02 / ORCHESTRATION</span><h2>Agent execution</h2></div><span className="live-dot">LIVE</span></div><div className="steps">{stages.map((s,i)=><div className={`step ${s.state}`} key={s.name}><span className="step-index">0{i+1}</span><i className="dot"/><span>{s.name}</span><small>{s.state==="done"?"DONE":s.state==="active"?"ACTIVE":"WAITING"}</small></div>)}</div></div></section><section className="metrics">{metrics.map(label=><div className="metric" key={label}><span>{label}</span><b>{metricValue(data,label)}</b><em>{label==="Confidence"?"grounded signal":label==="Latency"?"end-to-end":"current run"}</em></div>)}</section><section className="workspace-grid"><div className="panel evidence-panel"><div className="panel-head"><div><span className="section-kicker">03 / TRACEABILITY</span><h2>Evidence trail</h2></div><span className="count">{evidence.length||0} items</span></div><div className="evidence">{evidence.length?evidence.map((item,i)=><div className="row" key={i}><div className="row-top"><code>EVIDENCE {String(i+1).padStart(2,"0")}</code><span>grounded</span></div><div>{typeof item==="string"?item:JSON.stringify(item)}</div></div>):<div className="empty"><span>◇</span><div><b>No evidence captured yet</b><p>Run an investigation to populate repository-grounded findings.</p></div></div>}</div></div><div className="panel outcome-panel"><div className="panel-head"><div><span className="section-kicker">04 / DECISION</span><h2>Engineering outcome</h2></div><span className={`pill ${waitingApproval?"warn":statusTone(data?.status)}`}>{waitingApproval?"HUMAN REVIEW":data?.status?.toUpperCase()??"READY"}</span></div><div className="outcome-summary"><div className="outcome-icon">{waitingApproval?"!":"✓"}</div><div><b>{waitingApproval?"Approval required":data?.status==="completed"?"Investigation complete":"Awaiting execution"}</b><p>{waitingApproval?"Review the proposed mutation before execution.":"Outcome is populated directly from durable task state."}</p></div></div>{waitingApproval&&<div className="controls approval"><button className="primary" onClick={()=>approval(true)} disabled={running}>Approve change</button><button className="secondary" onClick={()=>approval(false)} disabled={running}>Reject</button></div>}<div className="detail-list"><div><span>Task ID</span><code>{data?.task_id??"—"}</code></div><div><span>Verification</span><strong className={statusTone(verification)}>{String(verification).toUpperCase()}</strong></div><div><span>Evaluation</span><strong>{String(quality)}</strong></div><div><span>Pull request</span><code>{data?.pull_request?.url?String(data.pull_request.url):"—"}</code></div></div></div></section><section className="lower-grid"><div className="panel report-panel"><div className="panel-head"><div><span className="section-kicker">05 / REPORT</span><h2>Final engineering report</h2></div></div><pre className="report">{reportText}</pre></div><div className="panel events-panel"><div className="panel-head"><div><span className="section-kicker">06 / OBSERVABILITY</span><h2>Execution timeline</h2></div><span className="count">{events.length||0} events</span></div><div className="timeline">{events.length?events.map((event,i)=><div className="event" key={i}><span className="event-line"/><div><b>{String(event.event_type??event.type??"agent event")}</b><p>{String(event.message??event.detail??"Task state recorded")}</p></div><code>{String(event.timestamp??event.created_at??"—")}</code></div>):<div className="empty"><span>◷</span><div><b>Timeline is waiting</b><p>Agent, tool and verification events appear here as the task runs.</p></div></div>}</div></div></section><footer><span>AI ENGINEERING COMMAND CENTER</span><span>Evidence-first · Human-approved · Observable</span><span>v0.1 / production-style reference</span></footer></main></div>}
+const repoModules = [
+  "apps/",
+  "agents/",
+  "core/",
+  "tooling/",
+  "tests/",
+  "docs/",
+];
+
+const agentFlow = [
+  { title: "Planner", text: "Breaks the engineering task into evidence-backed steps." },
+  { title: "Research", text: "Inspects repo context, code, and retrieval sources." },
+  { title: "Code", text: "Implements fixes and updates the relevant files." },
+  { title: "Verify", text: "Runs checks and validates behavior with test evidence." },
+  { title: "Review", text: "Flags risk and prepares final approval-ready summaries." },
+];
+
+const metrics = [
+  { label: "Live repos", value: "03" },
+  { label: "Active agents", value: "05" },
+  { label: "Evaluations", value: "24" },
+  { label: "Approval loop", value: "HITL" },
+];
+
+export default function Home() {
+  const [formOpen, setFormOpen] = useState(false);
+  const [task, setTask] = useState("Investigate the repository and identify its main components and potential risks.");
+  const [repository, setRepository] = useState("octocat/Hello-World");
+  const [ref, setRef] = useState("main");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [error, setError] = useState("");
+  const formRef = useRef<HTMLElement>(null);
+
+  function openInvestigation(review = false) {
+    if (review) setTask("Review the repository for correctness, security, and maintainability risks.");
+    setError("");
+    setFormOpen(true);
+    window.setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  }
+
+  async function submitInvestigation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setResult(null);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/v1/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task, repository, ref }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail ?? data);
+        throw new Error(detail || `Request failed (${response.status})`);
+      }
+      setResult(data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not reach the task API.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <>
+      <video
+        className="art"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
+        poster="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/130837c4-0244-4f37-9c61-8d801d93fd29.jpg"
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260912_104303_0c6d60b2-9353-408e-9449-585108a22fb5.mp4"
+        aria-hidden="true"
+      />
+
+      <div className="veil" />
+
+      <div className="page-shell">
+        <header className="bar">
+          <a className="brand" href="#overview">
+            <svg viewBox="0 0 23 17" aria-hidden="true">
+              <path d="M8.15 0.9 L4.55 0.9 L0.5 9.3 L4.1 9.3 Z" />
+              <path d="M17.0 0 L13.4 0 L6.15 16.4 L9.75 16.4 Z" />
+              <path d="M22.9 0 L19.3 0 L15.0 7.6 L18.6 7.6 Z" />
+              <path d="M22.6 6.9 L19.0 6.9 L14.05 16.4 L17.65 16.4 Z" />
+            </svg>
+            <span id="word">AI CC</span>
+          </a>
+
+          <nav className="menu" aria-label="Main navigation">
+            <a href="#overview">Overview</a>
+            <a href="#repositories">Repositories</a>
+            <a href="#agents">Agents</a>
+            <a href="#evidence">Evidence</a>
+          </nav>
+
+          <button className="pill" type="button" onClick={() => openInvestigation()}>Open workspace</button>
+        </header>
+
+        <main className="hero" id="overview">
+          <p className="eyebrow">Repository-aware AI engineering</p>
+
+          <h1 className="title">
+            <span>AI Engineering</span>
+            <span>Command Center</span>
+          </h1>
+
+          <p className="sub">
+            Investigate real repositories, use tools, verify fixes, and keep risky actions
+            under human approval before they ship.
+          </p>
+
+          <div className="cta-row">
+            <button className="cta" type="button" onClick={() => openInvestigation()}>
+              <span>Launch investigation</span>
+              <svg className="arrow" viewBox="0 0 16 11" aria-hidden="true">
+                <path d="M0 5.5 H14.6 M10.3 1.2 L14.9 5.5 L10.3 9.8" />
+              </svg>
+            </button>
+            <button className="secondary" type="button" onClick={() => openInvestigation(true)}>Review repo</button>
+          </div>
+
+          <div className="stats" aria-label="Application status overview">
+            {metrics.map((item) => (
+              <div key={item.label} className="stat-card">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        </main>
+
+        {formOpen && (
+          <section className="task-panel" id="workspace" ref={formRef} aria-labelledby="task-title">
+            <div className="panel-header">
+              <span className="kicker">New task</span>
+              <button className="close-task" type="button" onClick={() => setFormOpen(false)} aria-label="Close task form">×</button>
+            </div>
+            <h2 id="task-title">Investigate a repository</h2>
+            <form className="task-form" onSubmit={submitInvestigation}>
+              <label className="field field-wide">
+                <span>Engineering task</span>
+                <textarea required minLength={1} value={task} onChange={(event) => setTask(event.target.value)} rows={3} />
+              </label>
+              <label className="field">
+                <span>GitHub repository</span>
+                <input required pattern="[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+" title="Use owner/repository format" value={repository} onChange={(event) => setRepository(event.target.value)} />
+              </label>
+              <label className="field">
+                <span>Branch or ref</span>
+                <input required value={ref} onChange={(event) => setRef(event.target.value)} />
+              </label>
+              <div className="form-actions">
+                <button className="cta" type="submit" disabled={submitting}>
+                  <span>{submitting ? "Submitting..." : "Run investigation"}</span>
+                  {!submitting && <svg className="arrow" viewBox="0 0 16 11" aria-hidden="true"><path d="M0 5.5 H14.6 M10.3 1.2 L14.9 5.5 L10.3 9.8" /></svg>}
+                </button>
+                <span className="form-note">The task runs against the configured API and repository.</span>
+              </div>
+            </form>
+            {error && <p className="task-message error" role="alert">{error}</p>}
+            {result && (
+              <div className="task-result" aria-live="polite">
+                <div><strong>Task {String(result.status ?? "submitted")}</strong><span>{result.task_id ? `ID ${String(result.task_id)}` : ""}</span></div>
+                <pre>{JSON.stringify(result, null, 2)}</pre>
+              </div>
+            )}
+          </section>
+        )}
+
+        <section className="dashboard" aria-label="Repository and workflow dashboard">
+          <article className="panel repo-panel" id="repositories">
+            <div className="panel-header">
+              <span className="kicker">Repo</span>
+              <span className="live-dot" aria-label="Live repository status" />
+            </div>
+
+            <h2>AI Engineering Command Center</h2>
+
+            <div className="repo-meta">
+              <span>main</span>
+              <span>Evidence-backed agent workflows</span>
+            </div>
+
+            <ul className="module-list">
+              {repoModules.map((module) => (
+                <li key={module}>
+                  <span className="module-name">{module}</span>
+                  <span className="module-status success">ready</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+
+          <article className="panel pipeline-panel" id="agents">
+            <div className="panel-header">
+              <span className="kicker">Workflow</span>
+            </div>
+
+            <h2>Investigation pipeline</h2>
+
+            <div className="pipeline-list">
+              {agentFlow.map((step, index) => (
+                <div key={step.title} className="pipeline-step">
+                  <span className="step-index">0{index + 1}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <p>{step.text}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="panel evidence-panel" id="evidence">
+            <div className="panel-header">
+              <span className="kicker">Evidence</span>
+            </div>
+
+            <h2>Verification stack</h2>
+
+            <div className="evidence-grid">
+              <div>
+                <span className="label">MCP tools</span>
+                <strong>GitHub + search + repo</strong>
+              </div>
+              <div>
+                <span className="label">Retrieval</span>
+                <strong>Azure AI Search</strong>
+              </div>
+              <div>
+                <span className="label">State</span>
+                <strong>Redis + LangGraph</strong>
+              </div>
+              <div>
+                <span className="label">Review</span>
+                <strong>Human approval loop</strong>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@100..900&display=swap');
+
+        :root {
+          --bg: #030914;
+          --bg-2: #071827;
+          --ink: #edf6ff;
+          --muted: rgba(208, 224, 241, 0.8);
+          --soft: rgba(176, 198, 224, 0.7);
+          --line: rgba(191, 212, 235, 0.34);
+          --panel: rgba(9, 17, 29, 0.54);
+          --panel-strong: rgba(8, 14, 24, 0.7);
+          --glow: rgba(134, 193, 255, 0.45);
+          --accent: #dfeaf9;
+          --accent-strong: #f5f4ff;
+          --success: #66f0c1;
+          --shadow: rgba(3, 8, 15, 0.7);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+          margin: 0;
+          min-height: 100%;
+          background: var(--bg);
+          color: var(--ink);
+          font-family: 'Sora', sans-serif;
+        }
+
+        body {
+          min-height: 100vh;
+          background:
+            radial-gradient(circle at 50% 20%, rgba(113, 164, 232, 0.18), transparent 32%),
+            linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+        }
+
+        a { color: inherit; text-decoration: none; }
+        button { color: inherit; font: inherit; cursor: pointer; }
+        ul { list-style: none; margin: 0; padding: 0; }
+
+        .art {
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center;
+          z-index: 0;
+          opacity: 0.8;
+          filter: saturate(0.9) contrast(1.12) brightness(0.7);
+          pointer-events: none;
+        }
+
+        .veil {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          background:
+            radial-gradient(140% 60% at 50% 42%, rgba(8, 15, 22, 0.08), rgba(3, 9, 20, 0.28) 38%, rgba(3, 9, 20, 0.8) 100%),
+            linear-gradient(180deg, rgba(2, 6, 12, 0.1), rgba(2, 6, 12, 0.7));
+          pointer-events: none;
+        }
+
+        .page-shell {
+          position: relative;
+          z-index: 1;
+          width: min(1400px, calc(100vw - 48px));
+          margin: 0 auto;
+          padding: 30px 0 70px;
+        }
+
+        .bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+          min-height: 86px;
+        }
+
+        .brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 14px;
+          font-size: 2.2rem;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          font-weight: 700;
+        }
+
+        .brand svg {
+          width: 30px;
+          height: 22px;
+          fill: var(--ink);
+          opacity: 0.95;
+        }
+
+        .menu {
+          display: flex;
+          align-items: center;
+          gap: 36px;
+          margin-left: auto;
+          margin-right: 26px;
+          font-size: 0.82rem;
+          color: var(--muted);
+        }
+
+        .menu a {
+          position: relative;
+          transition: color 0.2s ease;
+        }
+
+        .menu a::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          bottom: -8px;
+          width: 100%;
+          height: 1px;
+          background: rgba(197, 216, 239, 0.7);
+          transform: scaleX(0);
+          transform-origin: center;
+          transition: transform 0.2s ease;
+        }
+
+        .menu a:hover::after,
+        .menu a:focus-visible::after { transform: scaleX(1); }
+
+        .pill {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 180px;
+          min-height: 46px;
+          border-radius: 999px;
+          border: 1px solid var(--line);
+          background: rgba(255, 255, 255, 0.06);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 0 24px rgba(111, 170, 255, 0.12);
+          font-size: 0.82rem;
+          letter-spacing: 0.02em;
+        }
+
+        .hero {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          padding-top: 72px;
+        }
+
+        .task-panel {
+          width: min(900px, 100%);
+          margin: 42px auto 0;
+          padding: 24px;
+          border: 1px solid rgba(194, 215, 240, 0.2);
+          border-radius: 18px;
+          background: rgba(7, 14, 23, 0.78);
+          box-shadow: 0 18px 48px rgba(2, 6, 12, 0.34);
+          backdrop-filter: blur(18px);
+          -webkit-backdrop-filter: blur(18px);
+        }
+
+        .task-panel h2 {
+          margin: 0 0 20px;
+          font-size: 1.5rem;
+        }
+
+        .close-task {
+          width: 34px;
+          height: 34px;
+          border: 1px solid var(--line);
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.06);
+          font-size: 1.3rem;
+          line-height: 1;
+        }
+
+        .task-form {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .field {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          min-width: 0;
+          color: var(--muted);
+          font-size: 0.78rem;
+        }
+
+        .field-wide,
+        .form-actions { grid-column: 1 / -1; }
+
+        .field input,
+        .field textarea {
+          width: 100%;
+          border: 1px solid rgba(194, 215, 240, 0.24);
+          border-radius: 8px;
+          padding: 12px 14px;
+          background: rgba(1, 7, 13, 0.62);
+          color: var(--ink);
+          font: inherit;
+          font-size: 0.9rem;
+          resize: vertical;
+        }
+
+        .field input:focus-visible,
+        .field textarea:focus-visible,
+        button:focus-visible {
+          outline: 2px solid var(--success);
+          outline-offset: 3px;
+        }
+
+        .form-actions {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 14px;
+        }
+
+        .form-actions .cta { min-height: 48px; }
+        .cta:disabled { cursor: wait; opacity: 0.65; }
+
+        .form-note,
+        .task-result > div span {
+          color: var(--soft);
+          font-size: 0.76rem;
+        }
+
+        .task-message {
+          margin: 18px 0 0;
+          padding: 12px 14px;
+          border-radius: 8px;
+          line-height: 1.5;
+        }
+
+        .task-message.error {
+          border: 1px solid rgba(255, 142, 142, 0.4);
+          background: rgba(128, 30, 36, 0.22);
+          color: #ffd4d4;
+        }
+
+        .task-result {
+          margin-top: 20px;
+          overflow: hidden;
+          border: 1px solid rgba(194, 215, 240, 0.18);
+          border-radius: 10px;
+          background: rgba(1, 7, 13, 0.58);
+        }
+
+        .task-result > div {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 12px 14px;
+          border-bottom: 1px solid rgba(194, 215, 240, 0.14);
+        }
+
+        .task-result pre {
+          max-height: 320px;
+          overflow: auto;
+          margin: 0;
+          padding: 14px;
+          color: #d1e3f2;
+          font-size: 0.76rem;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+        }
+
+        .eyebrow {
+          margin: 0 0 22px;
+          font-size: 0.77rem;
+          letter-spacing: 0.22em;
+          text-transform: uppercase;
+          color: rgba(213, 232, 255, 0.74);
+        }
+
+        .title {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin: 0;
+          font-size: clamp(3.3rem, 5vw, 6.2rem);
+          line-height: 0.96;
+          letter-spacing: -0.06em;
+          font-weight: 700;
+        }
+
+        .sub {
+          margin: 30px 0 0;
+          max-width: 760px;
+          color: var(--muted);
+          font-size: clamp(1.1rem, 1.8vw, 1.7rem);
+          line-height: 1.55;
+          letter-spacing: -0.03em;
+        }
+
+        .cta-row {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 18px;
+          margin-top: 42px;
+        }
+
+        .cta,
+        .secondary {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          min-height: 62px;
+          border-radius: 999px;
+          padding: 0 28px;
+          font-weight: 600;
+          letter-spacing: -0.03em;
+        }
+
+        .cta {
+          background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+          border: 1px solid rgba(255,255,255,0.22);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.26), 0 0 36px rgba(131, 174, 255, 0.14);
+        }
+
+        .secondary {
+          border: 1px solid rgba(191, 212, 235, 0.24);
+          background: rgba(7, 12, 18, 0.2);
+          color: var(--accent);
+        }
+
+        .arrow {
+          width: 18px;
+          height: 12px;
+          stroke: var(--ink);
+          stroke-width: 1.8;
+          fill: none;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
+
+        .stats {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(140px, 1fr));
+          gap: 18px;
+          width: min(900px, 100%);
+          margin-top: 46px;
+        }
+
+        .stat-card {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          padding: 20px 14px 18px;
+          border: 1px solid rgba(194, 215, 240, 0.18);
+          border-radius: 18px;
+          background: rgba(12, 23, 33, 0.38);
+          box-shadow: 0 10px 30px rgba(6, 11, 18, 0.18);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+        }
+
+        .stat-card span {
+          font-size: 0.68rem;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: rgba(208, 223, 238, 0.8);
+        }
+
+        .stat-card strong {
+          font-size: clamp(1.2rem, 1.5vw, 1.9rem);
+          letter-spacing: -0.06em;
+        }
+
+        .dashboard {
+          display: grid;
+          grid-template-columns: 1.12fr 1.28fr 0.9fr;
+          gap: 22px;
+          margin-top: 72px;
+        }
+
+        .panel {
+          background: rgba(9, 16, 28, 0.56);
+          border: 1px solid rgba(194, 215, 240, 0.17);
+          border-radius: 22px;
+          padding: 22px 20px 20px;
+          box-shadow: 0 12px 34px rgba(2, 6, 12, 0.25);
+          backdrop-filter: blur(18px);
+          -webkit-backdrop-filter: blur(18px);
+        }
+
+        .panel-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 18px;
+        }
+
+        .kicker {
+          display: inline-block;
+          color: rgba(200, 221, 242, 0.78);
+          font-size: 0.72rem;
+          letter-spacing: 0.18em;
+          text-transform: uppercase;
+        }
+
+        .live-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: var(--success);
+          box-shadow: 0 0 14px rgba(102, 240, 193, 0.9);
+        }
+
+        .panel h2 {
+          margin: 0 0 16px;
+          font-size: clamp(1.4rem, 2.2vw, 2rem);
+          letter-spacing: -0.05em;
+        }
+
+        .repo-meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 16px;
+          padding: 12px 14px;
+          margin-bottom: 18px;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(215, 232, 252, 0.08);
+          color: var(--muted);
+          font-size: 0.82rem;
+        }
+
+        .module-list {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .module-list li {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding: 12px 12px;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.015);
+          border: 1px solid rgba(200, 220, 242, 0.06);
+        }
+
+        .module-name {
+          font-weight: 500;
+          letter-spacing: -0.02em;
+        }
+
+        .module-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px 10px;
+          border-radius: 999px;
+          font-size: 0.7rem;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .module-status.success {
+          background: rgba(102, 240, 193, 0.12);
+          color: #bfffe9;
+        }
+
+        .pipeline-list {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .pipeline-step {
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          padding: 12px 10px;
+          border-radius: 12px;
+          border: 1px solid rgba(201, 219, 235, 0.08);
+          background: rgba(255,255,255,0.012);
+        }
+
+        .step-index {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 38px;
+          height: 38px;
+          border-radius: 12px;
+          background: rgba(145, 188, 255, 0.1);
+          color: var(--accent-strong);
+          font-size: 0.7rem;
+          font-weight: 700;
+        }
+
+        .pipeline-step strong {
+          display: block;
+          margin-bottom: 6px;
+          font-size: 0.98rem;
+        }
+
+        .pipeline-step p {
+          margin: 0;
+          color: var(--muted);
+          font-size: 0.82rem;
+          line-height: 1.5;
+        }
+
+        .evidence-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .evidence-grid > div {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          border-radius: 14px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(201, 219, 235, 0.08);
+          padding: 16px 14px;
+        }
+
+        .label {
+          color: rgba(206, 221, 240, 0.76);
+          font-size: 0.7rem;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .evidence-grid strong {
+          font-size: 0.96rem;
+          line-height: 1.3;
+        }
+
+        @media (max-width: 1050px) {
+          .page-shell {
+            width: min(1100px, calc(100vw - 32px));
+          }
+
+          .dashboard {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .page-shell {
+            width: min(680px, calc(100vw - 22px));
+            padding-top: 18px;
+          }
+
+          .bar {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 14px;
+          }
+
+          .brand { font-size: 1.5rem; }
+          .menu {
+            order: 3;
+            width: 100%;
+            justify-content: center;
+            margin: 0;
+            gap: 18px;
+            flex-wrap: wrap;
+          }
+
+          .stats {
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+          }
+
+          .hero {
+            padding-top: 44px;
+          }
+
+          .task-panel { padding: 18px 14px; }
+          .task-form { grid-template-columns: 1fr; }
+          .field-wide,
+          .form-actions { grid-column: auto; }
+
+          .sub {
+            max-width: 560px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation: none !important;
+            transition: none !important;
+            scroll-behavior: auto !important;
+          }
+        }
+      `}</style>
+    </>
+  );
+}
