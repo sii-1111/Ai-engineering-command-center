@@ -7,10 +7,8 @@ from core.retrieval.local_source import LocalRepositorySource, LocalRepositorySo
 def test_local_search_filters_repository_and_ref(tmp_path: Path) -> None:
     index = tmp_path / "index.jsonl"
     index.write_text(
-        '{"source":"a.py","content":"search latency optimization","repository":"owner/repo","ref":"main"}
-'
-        '{"source":"b.py","content":"search latency","repository":"other/repo","ref":"main"}
-',
+        '{"source":"a.py","content":"search latency optimization","repository":"owner/repo","ref":"main"}\n'
+        '{"source":"b.py","content":"search latency","repository":"other/repo","ref":"main"}\n',
         encoding="utf-8",
     )
     results = LocalRepositoryRetriever(LocalSearchConfig(str(index))).search(
@@ -25,7 +23,7 @@ def test_local_source_reads_supported_files(tmp_path: Path) -> None:
     (root / "app.py").write_text("print('hello')", encoding="utf-8")
     (root / "notes.bin").write_bytes(b"ignored")
 
-    files = LocalRepositorySource(LocalRepositorySourceConfig(str(tmp_path / "repos"))).list_files(
-        "owner/repo", "main"
-    )
+    files = LocalRepositorySource(
+        LocalRepositorySourceConfig(str(tmp_path / "repos"))
+    ).list_files("owner/repo", "main")
     assert [item.path for item in files] == ["app.py"]
