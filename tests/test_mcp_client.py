@@ -18,7 +18,8 @@ def test_extracts_structured_content_when_text_is_missing() -> None:
 
 def test_extracts_model_dump_as_last_resort() -> None:
     class Result:
-        content = []
+        def __init__(self):
+            self.content = []
 
         def model_dump(self):
             return {"content": [{"type": "text", "text": "repository evidence"}]}
