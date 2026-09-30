@@ -1,1 +1,10 @@
-:root { --bg: #e8d8c1; --panel: #f5ecdf; --text: #35261b; --accent: #8a5a32; }
+:root{--bg:#e8d8c1;--panel:#f5ecdf;--text:#35261b;--accent:#8a5a32;--muted:#75604d;--line:#c8b297;--good:#5c704b}
+body{background:linear-gradient(180deg,#f5ecdf 0,#e3cfb3 100%);color:#35261b}
+.sidebar{background:#35251b;border-color:#594333}.brand{color:#f4e7d5}.workspace{color:#cbb59c;border-color:#624a36}.nav div{color:#bca58b}.nav .active{background:#543c2b;color:#fff1df;border-color:#76553a}.sidefoot{color:#9f8469}
+.logo{background:linear-gradient(135deg,#b77a45,#744522)}
+.eyebrow,.section-kicker,.mono{color:#8a5a32}.sub{color:#75604d}.status{background:#f1e4d3;color:#6d5947;border-color:#c8b297}
+.hero-grid .panel,.workspace-grid .panel,.lower-grid .panel,.panel{background:linear-gradient(180deg,#f8f0e5,#ecddc8);border-color:#c8b297;box-shadow:0 14px 40px #68482b22}
+.taskbox,.input,.report{background:#fbf4e9;color:#3b2a1e;border-color:#c8b297}.primary{background:#8a5a32}.secondary{background:#dfccb1;color:#4c3625;border-color:#b99d7e}
+.step,.row,.outcome-summary{background:#f8efe2;border-color:#d0bda4}.metric{background:#f0e1cc;border-color:#cbb79d}.metric span,.metric em{color:#806b56}
+.count,.detail-list span,.event p{color:#806b56}.row{color:#5b4634}.row code,.detail-list code,.event code{color:#806a54}.empty{border-color:#c5ae91;color:#806b56}.empty b{color:#594331}.pill{background:#e3d1b8;color:#806a54}.pill.good{background:#dce5d3;color:#526742}.pill.warn{background:#ecddc5;color:#8a5f34}.pill.danger{background:#ecd5d0;color:#874a40}
+.detail-list{border-color:#d0bda4}.detail-list div{border-color:#d8c5ad}.event{border-color:#d8c5ad}.event-line{background:#b99b78}footer{color:#806b56}
