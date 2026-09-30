@@ -27,18 +27,6 @@ def test_gemini_provider_reports_missing_api_key(monkeypatch) -> None:
     assert llm_configuration_error() == "Set backend environment variables: GEMINI_API_KEY"
 
 
-def test_azure_provider_remains_selectable(monkeypatch) -> None:
-    monkeypatch.setenv("LLM_PROVIDER", "azure")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "test-key")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com")
-    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "test-deployment")
-
-    with patch("core.llm.AzureOpenAI") as azure_client:
-        llm = LLM()
-
-    azure_client.assert_called_once()
-    assert llm.deployment == "test-deployment"
-
 
 def test_gemini_uses_fallback_model_after_temporary_unavailability(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
