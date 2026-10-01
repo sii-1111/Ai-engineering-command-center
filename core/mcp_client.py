@@ -62,7 +62,9 @@ def _extract_tool_result(result: Any) -> str:
     if not parts:
         try:
             dumped = result.model_dump(mode="json")
-        except (AttributeError, TypeError):
+        except TypeError:
+            dumped = result.model_dump()
+        except AttributeError:
             dumped = None
         if dumped:
             add(dumped.get("content"))
