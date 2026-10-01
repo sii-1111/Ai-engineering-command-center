@@ -1,7 +1,7 @@
 import os
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from langgraph.types import Command
@@ -86,24 +86,8 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/v1/tasks")
-def create_task(request: TaskRequest, authorization: str | None = Depends(api_key)) -> dict:
-    principal = authenticate_token(authorization.removeprefix("Bearer ").strip() if authorization else None)
-    if principal is None and os.getenv("COMMAND_CENTER_API_TOKEN"):
-        raise HTTPException(status_code=401, detail="Authentication required")
-    if principal:
-        try:
-            authorize_task(principal, "task:create")
-        except PermissionError as exc:
-            raise HTTPException(status_code=403, detail=str(exc)) from exc
-    configuration_error = llm_configuration_error()
-    if configuration_error:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Task execution is not configured. {configuration_error}",
-        )
-    task_id = str(uuid4())
-    task_store.save(build_task_record(task_id, request.task, request.repository, request.ref))
+def _run_task(task_id: str, request: TaskRequest) -> None:
+    task_store.update(task_id, status="running")
     try:
         result = graph.invoke(
             {
@@ -121,25 +105,84 @@ def create_task(request: TaskRequest, authorization: str | None = Depends(api_ke
         )
     except APIError as exc:
         upstream_status = exc.status_code if isinstance(exc, APIStatusError) else None
-        status_code = upstream_status if upstream_status in {429, 503} else 502
-        raise HTTPException(
-            status_code=status_code,
-            detail=f"LLM provider request failed ({upstream_status or 'connection error'}). Check provider availability and retry.",
-        ) from exc
+        error = (
+            f"LLM provider request failed ({upstream_status or 'connection error'}). "
+            "Check provider availability and retry."
+        )
+        task_store.update(task_id, status="failed", error=error)
+        return
+    except Exception as exc:  # noqa: BLE001 - persist unexpected background-task failures
+        task_store.update(task_id, status="failed", error=f"Task execution failed: {type(exc).__name__}.")
+        return
+
     save_task_snapshot(task_id, result)
     task_store.update(task_id, status=result.get("status", "completed"))
-    return {**_serialize_result(task_id, result), "audit": audit_event(subject=principal.subject if principal else "anonymous", action="task.create", resource=task_id, outcome="success")}
+
+
+@app.post("/v1/tasks", status_code=202)
+def create_task(
+    request: TaskRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str | None = Depends(api_key),
+) -> dict:
+    principal = authenticate_token(authorization.removeprefix("Bearer ").strip() if authorization else None)
+    if principal is None and os.getenv("COMMAND_CENTER_API_TOKEN"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if principal:
+        try:
+            authorize_task(principal, "task:create")
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+    configuration_error = llm_configuration_error()
+    if configuration_error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Task execution is not configured. {configuration_error}",
+        )
+    task_id = str(uuid4())
+    task_store.save(build_task_record(task_id, request.task, request.repository, request.ref))
+    background_tasks.add_task(_run_task, task_id, request)
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "report": {},
+        "evidence": [],
+        "tool_calls": [],
+        "final_report": "",
+        "audit": audit_event(
+            subject=principal.subject if principal else "anonymous",
+            action="task.create",
+            resource=task_id,
+            outcome="queued",
+        ),
+    }
 
 
 @app.get("/v1/tasks/{task_id}")
 async def get_task(task_id: str) -> dict:
+    record = task_store.get(task_id)
     state = graph.get_state(_config(task_id))
     if not state.values:
-        raise HTTPException(status_code=404, detail="Task not found")
-    record = task_store.get(task_id)
-    if record is None and state.values:
-        record = build_task_record(task_id, str(state.values.get("task", "")), str(state.values.get("repository", "")), str(state.values.get("ref", "main")))
-    return {**_serialize_result(task_id, state.values), "task_metadata": record.as_dict() if record else {}}
+        if record is None:
+            raise HTTPException(status_code=404, detail="Task not found")
+        return {
+            "task_id": task_id,
+            "status": record.status,
+            "report": {},
+            "evidence": [],
+            "tool_calls": [],
+            "final_report": "",
+            "error": record.error,
+            "task_metadata": record.as_dict(),
+        }
+    if record is None:
+        record = build_task_record(
+            task_id,
+            str(state.values.get("task", "")),
+            str(state.values.get("repository", "")),
+            str(state.values.get("ref", "main")),
+        )
+    return {**_serialize_result(task_id, state.values), "task_metadata": record.as_dict()}
 
 
 @app.post("/v1/tasks/{task_id}/approval")

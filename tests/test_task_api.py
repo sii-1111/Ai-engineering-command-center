@@ -1,7 +1,6 @@
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
-from openai import APIConnectionError
 
 from apps.api.app.main import _serialize_result, app
 
@@ -23,13 +22,12 @@ def test_create_task_reports_missing_gemini_key(monkeypatch) -> None:
     assert "GEMINI_API_KEY" in response.json()["detail"]
 
 
-def test_create_task_returns_retryable_provider_error(monkeypatch) -> None:
+def test_create_task_queues_provider_work_without_blocking(monkeypatch) -> None:
     monkeypatch.setenv("LLM_PROVIDER", "gemini")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    monkeypatch.setattr(
-        "apps.api.app.main.graph.invoke",
-        Mock(side_effect=APIConnectionError(request=Mock())),
-    )
+    monkeypatch.setattr("apps.api.app.main.task_store.save", Mock(return_value=True))
+    monkeypatch.setattr("apps.api.app.main.audit_event", Mock(return_value={"event": "queued"}))
+    monkeypatch.setattr("apps.api.app.main.graph.invoke", Mock(return_value={"status": "completed"}))
 
     response = TestClient(app).post(
         "/v1/tasks",
@@ -41,9 +39,10 @@ def test_create_task_returns_retryable_provider_error(monkeypatch) -> None:
         headers={"Origin": "http://localhost:3003"},
     )
 
-    assert response.status_code == 502
+    assert response.status_code == 202
     assert response.headers["access-control-allow-origin"] == "*"
-    assert "connection error" in response.json()["detail"]
+    assert response.json()["status"] == "queued"
+    assert response.json()["task_id"]
 
 
 def test_serialize_result_includes_raw_evidence_and_tool_calls() -> None:

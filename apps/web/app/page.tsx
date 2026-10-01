@@ -137,6 +137,7 @@ export default function Home() {
   const [repository, setRepository] = useState("sii-1111/Ai-engineering-command-center");
   const [ref, setRef] = useState("main");
   const [submitting, setSubmitting] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState("");
   const formRef = useRef<HTMLElement>(null);
@@ -151,6 +152,7 @@ export default function Home() {
   async function submitInvestigation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting(true);
+    setElapsedSeconds(0);
     setError("");
     setResult(null);
 
@@ -166,7 +168,47 @@ export default function Home() {
         const detail = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail ?? data);
         throw new Error(detail || `Request failed (${response.status})`);
       }
+
       setResult(data);
+      const taskId = String(data.task_id ?? "");
+      if (!taskId) throw new Error("The task API did not return a task ID.");
+
+      const terminalStatuses = new Set([
+        "completed",
+        "awaiting_approval",
+        "rejected",
+        "failed",
+        "change_failed",
+        "verification_failed",
+        "verification_passed",
+      ]);
+
+      const startedAt = Date.now();
+      for (let attempt = 0; attempt < 300; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, attempt === 0 ? 800 : 2000));
+        setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+
+        const statusResponse = await fetch(`${apiUrl}/v1/tasks/${encodeURIComponent(taskId)}`, {
+          cache: "no-store",
+        });
+        if (statusResponse.status === 404) continue;
+
+        const statusData = await statusResponse.json();
+        if (!statusResponse.ok) {
+          const detail = typeof statusData.detail === "string"
+            ? statusData.detail
+            : JSON.stringify(statusData.detail ?? statusData);
+          throw new Error(detail || `Task status failed (${statusResponse.status})`);
+        }
+
+        setResult(statusData);
+        if (terminalStatuses.has(String(statusData.status))) {
+          if (statusData.status === "failed" && statusData.error) {
+            throw new Error(String(statusData.error));
+          }
+          break;
+        }
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not reach the task API.");
     } finally {
@@ -280,10 +322,14 @@ export default function Home() {
               </label>
               <div className="form-actions">
                 <button className="cta" type="submit" disabled={submitting}>
-                  <span>{submitting ? "Submitting..." : "Run investigation"}</span>
+                  <span>{submitting ? "Investigating..." : "Run investigation"}</span>
                   {!submitting && <svg className="arrow" viewBox="0 0 16 11" aria-hidden="true"><path d="M0 5.5 H14.6 M10.3 1.2 L14.9 5.5 L10.3 9.8" /></svg>}
                 </button>
-                <span className="form-note">The task runs against the configured API and repository.</span>
+                <span className="form-note">
+                  {submitting
+                    ? `Investigation is running in the background · ${elapsedSeconds}s elapsed`
+                    : "The task runs against the configured API and repository."}
+                </span>
               </div>
             </form>
             {error && <p className="task-message error" role="alert">{error}</p>}
@@ -291,9 +337,25 @@ export default function Home() {
               <div className="task-result" aria-live="polite">
                 <div className="task-result-header">
                   <strong>Task {String(result.status ?? "submitted").replaceAll("_", " ")}</strong>
-                  <span>{result.task_id ? `ID ${String(result.task_id)}` : ""}</span>
+                  <span>
+                    {submitting ? `${elapsedSeconds}s elapsed · ` : ""}
+                    {result.task_id ? `ID ${String(result.task_id)}` : ""}
+                  </span>
                 </div>
-                <InvestigationResult result={result} />
+                {submitting ? (
+                  <div className="task-progress" role="status" aria-live="polite">
+                    <span className="progress-spinner" aria-hidden="true" />
+                    <div>
+                      <strong>Investigation in progress</strong>
+                      <p>
+                        The agent is inspecting the repository and reasoning over the evidence.
+                        The final report will appear automatically when the task completes.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <InvestigationResult result={result} />
+                )}
               </div>
             )}
           </section>
@@ -817,10 +879,66 @@ export default function Home() {
 
         .task-result {
           margin-top: 20px;
-          overflow: hidden;
+          max-height: min(70vh, 760px);
+          overflow-x: hidden;
+          overflow-y: auto;
+          scrollbar-gutter: stable;
           border: 1px solid rgba(194, 215, 240, 0.18);
           border-radius: 10px;
           background: rgba(1, 7, 13, 0.58);
+        }
+
+        .task-result::-webkit-scrollbar {
+          width: 10px;
+        }
+
+        .task-result::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.025);
+          border-radius: 999px;
+        }
+
+        .task-result::-webkit-scrollbar-thumb {
+          background: rgba(194, 215, 240, 0.32);
+          border: 2px solid rgba(1, 7, 13, 0.58);
+          border-radius: 999px;
+        }
+
+        .task-result::-webkit-scrollbar-thumb:hover {
+          background: rgba(194, 215, 240, 0.52);
+        }
+
+        .task-progress {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 28px 20px;
+          border-bottom: 1px solid rgba(194, 215, 240, 0.12);
+        }
+
+        .task-progress strong {
+          display: block;
+          font-size: 0.86rem;
+        }
+
+        .task-progress p {
+          margin: 5px 0 0;
+          color: var(--soft);
+          font-size: 0.72rem;
+          line-height: 1.5;
+        }
+
+        .progress-spinner {
+          width: 28px;
+          height: 28px;
+          flex: 0 0 auto;
+          border: 2px solid rgba(194, 215, 240, 0.18);
+          border-top-color: var(--success);
+          border-radius: 50%;
+          animation: task-spin 0.9s linear infinite;
+        }
+
+        @keyframes task-spin {
+          to { transform: rotate(360deg); }
         }
 
         .task-result > div {
