@@ -700,6 +700,7 @@ export default function Home() {
         }
 
         .investigation-result {
+          min-width: 920px;
           padding: 18px;
         }
 
@@ -880,9 +881,9 @@ export default function Home() {
         .task-result {
           margin-top: 20px;
           max-height: min(70vh, 760px);
-          overflow-x: hidden;
+          overflow-x: auto;
           overflow-y: auto;
-          scrollbar-gutter: stable;
+          scrollbar-gutter: stable both-edges;
           border: 1px solid rgba(194, 215, 240, 0.18);
           border-radius: 10px;
           background: rgba(1, 7, 13, 0.58);
@@ -890,6 +891,7 @@ export default function Home() {
 
         .task-result::-webkit-scrollbar {
           width: 10px;
+          height: 10px;
         }
 
         .task-result::-webkit-scrollbar-track {
@@ -905,6 +907,10 @@ export default function Home() {
 
         .task-result::-webkit-scrollbar-thumb:hover {
           background: rgba(194, 215, 240, 0.52);
+        }
+
+        .task-result::-webkit-scrollbar-corner {
+          background: rgba(1, 7, 13, 0.58);
         }
 
         .task-progress {
