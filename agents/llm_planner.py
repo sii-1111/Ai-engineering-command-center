@@ -54,7 +54,13 @@ Rules:
 """
 
 def _successful_tool_call_count(state: EngineeringState) -> int:
-    return sum(1 for call in state.get("tool_calls", []) if call.get("status") == "success")
+    evidence_by_id = {item.get("id"): item for item in state.get("evidence", [])}
+    return sum(
+        1
+        for call in state.get("tool_calls", [])
+        if call.get("status") == "success"
+        and str(evidence_by_id.get(call.get("id"), {}).get("detail", "")).strip()
+    )
 
 
 def _fallback_investigation_tool(state: EngineeringState) -> dict:
@@ -166,10 +172,14 @@ def build_dynamic_plan(state: EngineeringState) -> EngineeringState:
 def decide_next_action(state: EngineeringState) -> EngineeringState:
     if _bounded_tool_calls(state):
         return {**state, "status": "investigation_complete", "report": _bounded_report(state)}
-    if _successful_tool_call_count(state) < 3:
-        context_note = "You MUST choose another read-only tool because fewer than 3 successful tool calls have been collected."
+    usable_evidence_count = _successful_tool_call_count(state)
+    if usable_evidence_count < 3:
+        context_note = (
+            "You MUST choose another read-only tool because fewer than 3 successful tool calls "
+            "with non-empty evidence have been collected. Empty tool responses do not count."
+        )
     else:
-        context_note = "You may finish only when the evidence is sufficient; otherwise choose another tool."
+        context_note = "You may finish only when the evidence is sufficient and directly supports a conclusion; otherwise choose another tool."
 
     context = json.dumps({
         "task": state["task"], "repository": state["repository"], "ref": state.get("ref", "main"),
@@ -185,7 +195,7 @@ def decide_next_action(state: EngineeringState) -> EngineeringState:
         {"role": "user", "content": context},
     ])
     if decision.get("action") == "finish":
-        if _successful_tool_call_count(state) < 3:
+        if usable_evidence_count < 3:
             fallback = _fallback_investigation_tool(state)
             return {**state,
                     "dynamic_plan": [fallback],
