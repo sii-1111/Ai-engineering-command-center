@@ -1,8 +1,6 @@
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
-from openai import APIConnectionError
-
 from apps.api.app.main import _serialize_result, app
 
 
