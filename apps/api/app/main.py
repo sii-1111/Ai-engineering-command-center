@@ -111,7 +111,7 @@ def _run_task(task_id: str, request: TaskRequest) -> None:
         )
         task_store.update(task_id, status="failed", error=error)
         return
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - persist unexpected background-task failures
         task_store.update(task_id, status="failed", error=f"Task execution failed: {type(exc).__name__}.")
         return
 
