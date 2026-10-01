@@ -11,42 +11,65 @@ from mcp import ClientSession, StdioServerParameters
 
 
 def _extract_tool_result(result: Any) -> str:
+    """Normalize MCP text/structured responses into evidence the agent can inspect."""
     parts: list[str] = []
+    seen: set[str] = set()
+
+    def add(value: Any) -> None:
+        if value is None:
+            return
+        if isinstance(value, str):
+            if value.strip() and value not in seen:
+                seen.add(value)
+                parts.append(value)
+            return
+        if isinstance(value, (dict, list)):
+            serialized = json.dumps(value)
+            if serialized not in seen:
+                seen.add(serialized)
+                parts.append(serialized)
+            return
+        add(str(value))
+
     for item in getattr(result, "content", []) or []:
         text = getattr(item, "text", None)
         if text:
-            parts.append(str(text))
+            add(text)
             continue
         if isinstance(item, dict):
-            if item.get("text"):
-                parts.append(str(item["text"]))
-            elif item.get("data") is not None:
-                parts.append(json.dumps(item["data"]))
-            else:
-                parts.append(json.dumps(item))
+            add(item.get("text"))
+            add(item.get("data"))
+            if not item.get("text") and item.get("data") is None:
+                add(item)
             continue
         try:
-            dumped = item.model_dump()
-        except AttributeError:
+            dumped = item.model_dump(mode="json")
+        except (AttributeError, TypeError):
             dumped = None
         if dumped:
-            if dumped.get("text"):
-                parts.append(str(dumped["text"]))
-            elif dumped.get("data") is not None:
-                parts.append(json.dumps(dumped["data"]))
-            else:
-                parts.append(json.dumps(dumped))
+            add(dumped.get("text"))
+            add(dumped.get("data"))
+            if not dumped.get("text") and dumped.get("data") is None:
+                add(dumped)
 
     structured = getattr(result, "structuredContent", None) or getattr(result, "structured_content", None)
-    if structured:
-        parts.append(json.dumps(structured))
+    if structured is not None:
+        if isinstance(structured, dict) and set(structured) == {"result"}:
+            add(structured["result"])
+        else:
+            add(structured)
+
     if not parts:
         try:
+            dumped = result.model_dump(mode="json")
+        except TypeError:
             dumped = result.model_dump()
         except AttributeError:
             dumped = None
         if dumped:
-            parts.append(json.dumps(dumped))
+            add(dumped.get("content"))
+            add(dumped.get("structuredContent"))
+            add(dumped.get("structured_content"))
     return "\n".join(parts)
 
 
